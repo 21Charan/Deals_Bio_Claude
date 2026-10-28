@@ -1,5 +1,6 @@
 # Built pages embed the workbook's data - rebuild locally, don't commit them
 *.html
+!template.html
 
 # Real workbooks stay on your machine; only the sample is tracked
 *.xlsx
@@ -8,14 +9,14 @@
 *(backup before input tabs)*
 ~$*
 
+# Your private settings and logo
+local_settings.py
+logo.*
+*logo*.png
+*logo*.jpg
+*logo*.svg
+
 # Python
 __pycache__/
 *.pyc
 .venv/
-
-# Your private settings and branding
-local_settings.py
-engine/logo*.png
-engine/logo*.jpg
-engine/logo*.svg
-engine/*logo*.*
