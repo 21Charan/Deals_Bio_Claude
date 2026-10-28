@@ -1,0 +1,227 @@
+{
+  "team": {
+    "teamName": "Your Team Name",
+    "summary": "Team supports global Deals through research, analysis, and due diligence across Sustainability/ESG/Energy Transition/EUR/IUR topics",
+    "leaders": [
+      {
+        "name": "Leader One",
+        "role": "Managing Director",
+        "note": "Practice Leader"
+      },
+      {
+        "name": "Leader Two",
+        "role": "Director",
+        "note": ""
+      },
+      {
+        "name": "Leader Three",
+        "role": "Manager",
+        "note": "Primary point of contact"
+      }
+    ],
+    "members": "6 Members",
+    "keyContacts": [
+      {
+        "territory": "Australia",
+        "name": "Contact Name",
+        "role": "Partner"
+      },
+      {
+        "territory": "USA",
+        "name": "Contact Name",
+        "role": "Partner"
+      },
+      {
+        "territory": "Japan",
+        "name": "Contact Name",
+        "role": "Partner"
+      },
+      {
+        "territory": "Canada",
+        "name": "Contact Name",
+        "role": "Director"
+      }
+    ],
+    "currentServices": [
+      "Company Profiles/Target Snapshot",
+      "Industry ESG trends and analysis",
+      "Industry ESG regulatory overview",
+      "Value chain analysis",
+      "Customer commitments and targets analysis",
+      "Comparable company list",
+      "ESG materiality assessment",
+      "ESG maturity assessment",
+      "ESG metrics benchmarking",
+      "Social media and reputational risk scan",
+      "Industry ESG trends repository",
+      "Industry ESG regulations repository",
+      "Drafting Management interview questions",
+      "Sentiment analysis",
+      "Virtual Data Room data review"
+    ],
+    "futureServices": [
+      "Drafting Request for information (RFI)",
+      "ESG metrics benchmark repository",
+      "ESG Framework & Disclosures repository",
+      "Red Flags Screening",
+      "ESG Due Diligence (first draft)",
+      "ESG Action Plan (first draft)",
+      "ESG Value Creation Plan",
+      "High level Climate Risk assessment",
+      "Thought Leadership Support",
+      "Proposal Support"
+    ],
+    "frameworks": [
+      "SASB Standards",
+      "MSCI - ESG Industry Materiality Map",
+      "PRI",
+      "CDP"
+    ],
+    "databases": [
+      "Pitchbook",
+      "Merger Market",
+      "S&P Capital IQ",
+      "Inframation",
+      "Statista",
+      "Technavio",
+      "Factiva",
+      "Bloomberg",
+      "IBIS World (US)",
+      "Debtwire",
+      "Lexis Nexis (only for US)"
+    ],
+    "aiTools": [
+      "Web Plot Digitizer",
+      "Copilot",
+      "Cursor",
+      "Claude Design",
+      "Internal GenAI assistant",
+      "ChatGPT Enterprise",
+      "Replit",
+      "Harvey",
+      "Tolt",
+      "Visual Studio Code"
+    ]
+  },
+  "themes": {
+    "title": "Our Work Across Key Energy Transition Themes",
+    "items": [
+      {
+        "title": "Clean Energy Systems",
+        "tagline": "Core technologies enabling low-carbon transitions",
+        "points": [
+          [
+            "Hydrogen Mobility & Fuel",
+            "Market trends analysis across Asia; vehicle adoption studies by global OEMs"
+          ],
+          [
+            "EV Ecosystem",
+            "Market assessment for EV deals; EV charging infrastructure trends and policy mapping"
+          ],
+          [
+            "Battery Energy Storage (BESS)",
+            "Research on Australian BESS projects (stage, size, distribution)"
+          ],
+          [
+            "Renewable Energy Assets",
+            "Analysis of 600+ renewable projects (capex, equity ownership, conflict risks)"
+          ],
+          [
+            "Sustainable Aviation Fuel (SAF)",
+            "R&D on biofuel-based jet fuel pathways vs conventional fuel"
+          ]
+        ]
+      },
+      {
+        "title": "Carbon Markets, Climate Governance & ESG Frameworks",
+        "tagline": "Enabling credibility, compliance & climate governance maturity",
+        "points": [
+          [
+            "TCFD Framework",
+            "Slide preparation, peer benchmarking & gap analysis"
+          ],
+          [
+            "Voluntary Carbon Markets (VCM)",
+            "Countrywide policy analysis; comparison of IC-VCM/VCMI standards"
+          ],
+          [
+            "Biodiversity Credit Systems",
+            "Research on nature-based credit mechanisms supporting net zero"
+          ],
+          [
+            "ESG Frameworks & Standards",
+            "Benchmarking ESG disclosures & commitments"
+          ],
+          [
+            "Policy & Regulatory Analysis",
+            "Governance structures for renewable energy and carbon markets"
+          ],
+          [
+            "Carbon Capture & Storage (CCS)",
+            "Multi-country project assessments"
+          ]
+        ]
+      },
+      {
+        "title": "Decarbonisation Pathways & Sector Transitions",
+        "tagline": "Supporting industries in developing credible net-zero strategies",
+        "points": [
+          [
+            "Mine Decarbonisation",
+            "Benchmarking commitments; energy source transition plans"
+          ],
+          [
+            "Real Estate Transition",
+            "Mapping ESG KPIs & transition strategies"
+          ],
+          [
+            "Urban Regeneration Projects",
+            "Analysis of low-carbon infrastructure options (EV charging, green mobility)"
+          ],
+          [
+            "Education Sector Decarbonisation",
+            "Sustainability journey assessment & net-zero roadmap"
+          ],
+          [
+            "Industrial Emission Reduction",
+            "Options assessment across infrastructure & built environment"
+          ],
+          [
+            "DERMs & VPP Engineering",
+            "Global competitor and business model analysis"
+          ]
+        ]
+      },
+      {
+        "title": "Circular Economy, Resource Efficiency & Environmental Solutions",
+        "tagline": "Reducing waste, improving resource use & supporting nature-positive outcomes",
+        "points": [
+          [
+            "Solar Panel Recycling",
+            "Market study of obsolete panel recycling in Australia"
+          ],
+          [
+            "Waste Management",
+            "Company profiling, project analysis & government grant mapping"
+          ],
+          [
+            "Water & Wastewater Treatment",
+            "Project identification & future potential assessment"
+          ],
+          [
+            "Critical Minerals",
+            "Screening key projects and gathering intelligence"
+          ],
+          [
+            "Environment, Conservation & Wildlife",
+            "Strategic ESG guidance for environmental outcomes"
+          ],
+          [
+            "Investor Participation in Renewables",
+            "Investor landscape analysis & investment outlook"
+          ]
+        ]
+      }
+    ]
+  }
+}
