@@ -74,6 +74,7 @@ SHEET_SERVICES = "Services"
 SHEET_THEMES = "ET Themes"
 SHEET_STORY = "Story"
 SHEET_PRESETS = "Scenario Presets"
+SHEET_SETUP = "Setup"           # one place for every name, title and label shown on the pages
 # Used only if the workbook has no 'Global Model FY27 CPP' sheet.
 # Illustrative values only - put your real rate card in the workbook.
 DEFAULT_MODEL = {"SM": ("Senior Manager", 95, 96000), "M": ("Manager", 65, 64000),
@@ -252,6 +253,143 @@ DEFAULT_CONTENT = {'team': {'teamName': 'Your Team Name',
                                    'Investor landscape analysis & investment outlook']]}]}}
 
 
+# ================================================================== Setup tab ===
+# (section, field, placeholder/default, where it appears). Values in the Setup tab override the other tabs.
+def setup_fields():
+    team, story = DEFAULT_CONTENT["team"], STORY
+    leaders = team.get("leaders", []) + [{}] * 5
+    contacts = {k["territory"]: k for k in team.get("keyContacts", [])}
+    f = [("Branding", "Report title", REPORT_TITLE, "Title at the top of the dashboard"),
+         ("Branding", "Header subtitle", "Sustainability & ESG Delivery", "Next to the logo on the dashboard"),
+         ("Branding", "Classification", CLASSIFICATION, "Header and footer of both pages, e.g. 'Company Confidential | Internal use only'"),
+         ("Branding", "Logo file", "logo.png", "Logo file next to build.py, or a full path (PNG, JPG or SVG)"),
+         ("Branding", "Logo text", "Your Organisation", "Shown instead of the logo when the file is missing"),
+         ("Contact", "Contact name", "Your Name", "Last line of the story page and of the dashboard's last tab"),
+         ("Contact", "Contact email", "you@example.com", "Shown in brackets after the name, as an email link"),
+         ("Contact", "Contact name 2", "", "Optional second contact"),
+         ("Contact", "Contact email 2", "", "Optional"),
+         ("Team", "Team name", team.get("teamName", ""), "Team tab and the story's 'Who we are'"),
+         ("Team", "Team summary", team.get("summary", ""), "Quote under 'Meet the team'"),
+         ("Team", "Members", team.get("members", ""), "e.g. '6 Members'")]
+    for i in range(1, 6):
+        l = leaders[i - 1]
+        f += [("Team", f"Leader {i} - Name", l.get("name", ""), "Leave blank to hide" if i > 3 else "Team tab, in this order"),
+              ("Team", f"Leader {i} - Role", l.get("role", ""), ""),
+              ("Team", f"Leader {i} - Note", l.get("note", ""), "Optional line under the role")]
+    for t in TERRITORY_ORDER:
+        k = contacts.get(t, {})
+        f += [("Key contacts", f"{t} - Name", k.get("name", ""), "Territory partner / contact (blank = not shown)"),
+              ("Key contacts", f"{t} - Role", k.get("role", ""), "")]
+    f += [("Story", "Meeting", story["meeting"], "Small heading on the story's cover"),
+          ("Story", "Story title", story["title"], "Big title on the story's cover"),
+          ("Story", "Story subtitle", story["subtitle"], "Line under the title"),
+          ("Story", "Presenter", story["presenter"], "Cover and footer of the story, e.g. 'Team name, Organisation'")]
+    return f
+
+
+SETUP_PLACEHOLDERS = {"your name", "you@example.com", "your team name", "your organisation", "your team, your organisation",
+                      "leader one", "leader two", "leader three", "contact name"}
+SETUP_ALSO_CHECK = [
+    ("Global Model FY27 CPP", "Rate card: replace the illustrative Rate/hr and Cost/Person with your real values"),
+    ("Staff Master", "Sales prices and Home Sub LOS 2 tags come from your own export"),
+    ("Services", "Tools list: rename generic items (e.g. 'Internal GenAI assistant') to your tools"),
+    ("Assumptions", "'Current tagging' sentence shown in the assumptions on both pages"),
+    ("Story / ET Themes", "Remaining story wording (asks, win-win points, next steps) and theme text"),
+]
+
+
+def setup_prefill(wb):
+    """Current values from the workbook's own tabs, so a new Setup tab matches what the pages show today."""
+    cur = {}
+    def rows(name):
+        if name not in wb.sheetnames:
+            return []
+        data = list(wb[name].values)
+        if not data:
+            return []
+        hdr = [str(h).strip() if h is not None else "" for h in data[0]]
+        return [dict(zip(hdr, r)) for r in data[1:]]
+    for r in rows(SHEET_ASSUMPTIONS):
+        if r.get("Parameter") in ("Report title", "Classification") and clean_str(r.get("Value")):
+            cur[r["Parameter"]] = clean_str(r["Value"])
+    leaders, contacts = [], {}
+    for r in rows(SHEET_TEAM):
+        typ = clean_str(r.get("Type")).lower()
+        if typ == "team name": cur["Team name"] = clean_str(r.get("Name"))
+        elif typ == "summary": cur["Team summary"] = clean_str(r.get("Note")) or clean_str(r.get("Name"))
+        elif typ == "members": cur["Members"] = clean_str(r.get("Name"))
+        elif typ == "leader": leaders.append(r)
+        elif typ == "key contact": contacts[norm_territory(clean_str(r.get("Territory")))] = r
+    for i, l in enumerate(leaders[:5], 1):
+        cur[f"Leader {i} - Name"], cur[f"Leader {i} - Role"], cur[f"Leader {i} - Note"] = (clean_str(l.get(k)) for k in ("Name", "Role", "Note"))
+    for t, k in contacts.items():
+        cur[f"{t} - Name"], cur[f"{t} - Role"] = clean_str(k.get("Name")), clean_str(k.get("Role"))
+    smap = {"meeting": "Meeting", "title": "Story title", "subtitle": "Story subtitle", "presenter": "Presenter"}
+    for r in rows(SHEET_STORY):
+        k = smap.get(clean_str(r.get("Section")).lower())
+        if k and clean_str(r.get("Text")): cur[k] = clean_str(r.get("Text"))
+    if CONTACT_NAME: cur["Contact name"] = CONTACT_NAME
+    if CONTACT_EMAIL: cur["Contact email"] = CONTACT_EMAIL
+    return cur
+
+
+def add_setup_tab(wb):
+    cur = setup_prefill(wb)
+    ws = wb.create_sheet(SHEET_SETUP, 0)
+    ws.append(["Section", "Field", "Value", "Where it appears"])
+    yellow, grey = PatternFill("solid", fgColor="FFF2CC"), PatternFill("solid", fgColor="F2F2F2")
+    for sec, field, default, where in setup_fields():
+        ws.append([sec, field, cur.get(field, default), where])
+    ws.append([]); ws.append(["Also check", "Tab", "", "What to replace"])
+    for tab, what in SETUP_ALSO_CHECK:
+        ws.append(["Also check", tab, "", what])
+    style_sheet(ws, [14, 26, 60, 62], ORANGE)
+    for r in ws.iter_rows(min_row=2):
+        if r[0].value and r[0].value != "Also check":
+            r[2].fill = yellow
+            if clean_str(r[2].value).lower() in SETUP_PLACEHOLDERS:
+                r[2].font = Font(bold=True, color="C00000")      # placeholder still to replace
+        elif r[0].value == "Also check":
+            for c in r: c.fill = grey
+    ws.sheet_properties.tabColor = "FFC000"
+    note = ws.cell(row=1, column=6, value="Fill the yellow Value cells (red text = placeholder still to replace). "
+                                          "Values here override the Team, Story and Assumptions tabs. Blank = use those tabs.")
+    note.font = Font(italic=True, color="7D7D7D"); note.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.column_dimensions["F"].width = 46
+
+
+def read_setup(df):
+    if df is None or "Field" not in df.columns:
+        return {}
+    return {clean_str(f): clean_str(v) for sec, f, v in zip(df.get("Section", [""] * len(df)), df["Field"], df.get("Value", [""] * len(df)))
+            if clean_str(f) and clean_str(sec).lower() != "also check"}
+
+
+def apply_setup(payload, setup):
+    """Setup tab values win over the other tabs; blank values leave things as they are."""
+    global LOGO_FILE, LOGO_TEXT
+    g = lambda k: setup.get(k, "")
+    m, team, story = payload["meta"], payload["content"]["team"], payload["story"]
+    if g("Report title"): m["title"] = g("Report title")
+    if g("Classification"): m["classification"] = g("Classification")
+    m["headerSubtitle"] = g("Header subtitle") or m.get("headerSubtitle") or "Sustainability & ESG Delivery"
+    if g("Logo file"): LOGO_FILE = g("Logo file")
+    if g("Logo text"): LOGO_TEXT = g("Logo text")
+    people = [{"name": g(f"Contact name{s}"), "email": g(f"Contact email{s}")} for s in ("", " 2") if g(f"Contact name{s}") or g(f"Contact email{s}")]
+    if people: m["contact"]["people"] = people
+    for k, key in (("Team name", "teamName"), ("Team summary", "summary"), ("Members", "members")):
+        if g(k): team[key] = g(k)
+    leaders = [{"name": g(f"Leader {i} - Name"), "role": g(f"Leader {i} - Role"), "note": g(f"Leader {i} - Note")} for i in range(1, 6) if g(f"Leader {i} - Name")]
+    if leaders: team["leaders"] = leaders
+    contacts = [{"territory": t, "name": g(f"{t} - Name"), "role": g(f"{t} - Role")} for t in TERRITORY_ORDER if g(f"{t} - Name")]
+    if contacts: team["keyContacts"] = contacts
+    for k, key in (("Meeting", "meeting"), ("Story title", "title"), ("Story subtitle", "subtitle"), ("Presenter", "presenter")):
+        if g(k): story[key] = g(k)
+    todo = [k for k, v in setup.items() if v.lower() in SETUP_PLACEHOLDERS]
+    if not g("Contact name") and not CONTACT_NAME: todo.append("Contact name")
+    return todo
+
+
 # ================================================================ read the data ===
 def norm_territory(v):
     s = str(v).strip()
@@ -298,7 +436,7 @@ def load(excel_path):
                 assum[clean_str(r["Parameter"])] = r["Value"]
     wrn_cat = xl.parse(SHEET_WRN_CAT, dtype=str) if SHEET_WRN_CAT in xl.sheet_names else pd.DataFrame()
     inputs = {name: xl.parse(name).rename(columns=lambda c: str(c).strip()).dropna(how="all")
-              for name in (SHEET_TAG_MAP, SHEET_TEAM, SHEET_SERVICES, SHEET_THEMES, SHEET_STORY, SHEET_PRESETS)
+              for name in (SHEET_TAG_MAP, SHEET_TEAM, SHEET_SERVICES, SHEET_THEMES, SHEET_STORY, SHEET_PRESETS, SHEET_SETUP)
               if name in xl.sheet_names}
     return raw, staff, model, callouts, assum, wrn_cat, inputs
 
@@ -531,7 +669,8 @@ def build_payload(raw, staff, model, callouts, assum, wrn_cat, inputs, source_na
     payload = {"meta": meta, "months": [str(p) for p in months], "territories": terrs,
                "staff": [smap[n] for n in staff_names], "teams": teams, "flags": flags, "categories": cats,
                "projects": projects, "rows": rows, "model": model_rates, "callouts": calls,
-               "content": inp["content"], "storyInput": inp["story"]}
+               "content": inp["content"], "storyInput": inp["story"],
+               "setupInput": (inputs or {}).get(SHEET_SETUP)}   # read by apply_setup, removed before writing
 
     report = {
         "rows used": len(rows), "rows dropped (no month/hours/staff/territory)": dropped,
@@ -611,6 +750,7 @@ def tables(wb):
 
 README = [
     ["Tab", "What it is", "Who updates it", "How"],
+    [SHEET_SETUP, "Names, titles, logo, contacts, team and story cover - everything shown on the pages", "Once, then as people change", "Fill the yellow cells; red text = placeholder still to replace"],
     [SHEET_RAW, "Time entries (one row per entry)", "Monthly export", "Paste the new export; keep the column headers"],
     [SHEET_STAFF, "People: level, team, Home Sub LOS 2 tag, sales price", "When people join, move or rates change", "One row per person; 'Sales Price' or 'Sales Price 2025', 'Sales Price 2026'..."],
     [SHEET_MODEL, "Global Model rate card (Rate/hr, Cost/Person by level)", "Once a year", "Levels must match Staff Master (SM, M, SA, A...)"],
@@ -681,8 +821,11 @@ def ensure_input_tabs(path):
             ws.append([p, v, n])
         style_sheet(ws, [30, 40, 70]); added.append(SHEET_ASSUMPTIONS)
 
+    if SHEET_SETUP not in wb.sheetnames:
+        add_setup_tab(wb); added.append(SHEET_SETUP)
+
     if "README" not in wb.sheetnames:
-        ws = wb.create_sheet("README", 0)
+        ws = wb.create_sheet("README", 1 if SHEET_SETUP in wb.sheetnames else 0)
         for r in README:
             ws.append(r)
         style_sheet(ws, [26, 52, 30, 70], ORANGE)
@@ -726,7 +869,9 @@ def logo_html():
 
 
 def write_page(template, chart_tag, payload, out):
-    html = (template.replace("/*__CHARTJS__*/", chart_tag).replace("<!--__LOGO__-->", logo_html())
+    import html as _html
+    sub = _html.escape(payload["meta"].get("headerSubtitle", ""))
+    html = (template.replace("/*__CHARTJS__*/", chart_tag).replace("<!--__LOGO__-->", logo_html()).replace("<!--__SUBTITLE__-->", sub)
                     .replace("/*__DATA__*/null", json.dumps(payload, separators=(",", ":"))))
     out.write_text(html, encoding="utf-8")
 
@@ -753,9 +898,11 @@ def main():
         payload["content"] = DEFAULT_CONTENT
     payload["story"] = {**STORY, **{k: v for k, v in (payload.get("storyInput") or {}).items() if v}}
     payload["meta"].update(dashboard=DASHBOARD_FILE, today=datetime.now().strftime("%B %Y"))
+    todo = apply_setup(payload, read_setup(payload.pop("setupInput", None)))
     print("Data check")
     for k, v in report.items():
         print(f"  {k:<45} {v}")
+    print(f"  {'Setup tab: still to fill':<45} {', '.join(todo) if todo else 'nothing - all placeholders replaced'}")
 
     print("\n[3/3] Writing the pages ...")
     chart_tag = "<script>" + tpl["CHARTJS"].strip() + "\n</script>"
