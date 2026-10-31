@@ -76,7 +76,10 @@ SHEET_SERVICES = "Services"
 SHEET_THEMES = "ET Themes"
 SHEET_STORY = "Story"
 SHEET_PRESETS = "Scenario Presets"
-SHEET_SETUP = "Setup"           # one place for every name, title and label shown on the pages
+SHEET_SETUP = "Setup"           # older layout (still read if there is no Team Sheet)
+SHEET_TEAMSHEET = "Team Sheet"  # THE one sheet you edit: names, titles, team, services, story, settings
+TS_COLS = ["Section", "Item", "Value", "Detail 1", "Detail 2", "Detail 3", "How to fill / where it appears"]
+OLD_INPUT_TABS = ["README", "Setup", "Team", "Services", "ET Themes", "Story", "Scenario Presets", "Tag Mapping", "Assumptions"]
 # Used only if the workbook has no 'Global Model FY27 CPP' sheet.
 # Illustrative values only - put your real rate card in the workbook.
 DEFAULT_MODEL = {"SM": ("Senior Manager", 95, 96000), "M": ("Manager", 65, 64000),
@@ -255,113 +258,11 @@ DEFAULT_CONTENT = {'team': {'teamName': 'Your Team Name',
                                    'Investor landscape analysis & investment outlook']]}]}}
 
 
-# ================================================================== Setup tab ===
-# (section, field, placeholder/default, where it appears). Values in the Setup tab override the other tabs.
-def setup_fields():
-    team, story = DEFAULT_CONTENT["team"], STORY
-    leaders = team.get("leaders", []) + [{}] * 5
-    contacts = {k["territory"]: k for k in team.get("keyContacts", [])}
-    f = [("Branding", "Report title", REPORT_TITLE, "Title at the top of the dashboard"),
-         ("Branding", "Summary title", "ESG Delivery: Summary", "Title of the one-page summary"),
-         ("Branding", "Header subtitle", "Sustainability & ESG Delivery", "Next to the logo on the dashboard"),
-         ("Branding", "Classification", CLASSIFICATION, "Header and footer of both pages, e.g. 'Company Confidential | Internal use only'"),
-         ("Branding", "Logo file", "logo.png", "Logo file next to build.py, or a full path (PNG, JPG or SVG)"),
-         ("Branding", "Logo text", "Your Organisation", "Shown instead of the logo when the file is missing"),
-         ("Contact", "Contact name", "Your Name", "Last line of the story page and of the dashboard's last tab"),
-         ("Contact", "Contact email", "you@example.com", "Shown in brackets after the name, as an email link"),
-         ("Contact", "Contact name 2", "", "Optional second contact"),
-         ("Contact", "Contact email 2", "", "Optional"),
-         ("Team", "Team name", team.get("teamName", ""), "Team tab and the story's 'Who we are'"),
-         ("Team", "Team summary", team.get("summary", ""), "Quote under 'Meet the team'"),
-         ("Team", "Members", team.get("members", ""), "e.g. '6 Members'")]
-    for i in range(1, 6):
-        l = leaders[i - 1]
-        f += [("Team", f"Leader {i} - Name", l.get("name", ""), "Leave blank to hide" if i > 3 else "Team tab, in this order"),
-              ("Team", f"Leader {i} - Role", l.get("role", ""), ""),
-              ("Team", f"Leader {i} - Note", l.get("note", ""), "Optional line under the role")]
-    for t in TERRITORY_ORDER:
-        k = contacts.get(t, {})
-        f += [("Key contacts", f"{t} - Name", k.get("name", ""), "Territory partner / contact (blank = not shown)"),
-              ("Key contacts", f"{t} - Role", k.get("role", ""), "")]
-    f += [("Story", "Meeting", story["meeting"], "Small heading on the story's cover"),
-          ("Story", "Story title", story["title"], "Big title on the story's cover"),
-          ("Story", "Story subtitle", story["subtitle"], "Line under the title"),
-          ("Story", "Presenter", story["presenter"], "Cover and footer of the story, e.g. 'Team name, Organisation'")]
-    return f
-
-
 SETUP_PLACEHOLDERS = {"your name", "you@example.com", "your team name", "your organisation", "your team, your organisation",
                       "leader one", "leader two", "leader three", "contact name"}
-SETUP_ALSO_CHECK = [
-    ("Global Model FY27 CPP", "Rate card: replace the illustrative Rate/hr and Cost/Person with your real values"),
-    ("Staff Master", "Sales prices and Home Sub LOS 2 tags come from your own export"),
-    ("Services", "Tools list: rename generic items (e.g. 'Internal GenAI assistant') to your tools"),
-    ("Assumptions", "'Current tagging' sentence shown in the assumptions on both pages"),
-    ("Story / ET Themes", "Remaining story wording (asks, win-win points, next steps) and theme text"),
-]
-
-
-def setup_prefill(wb):
-    """Current values from the workbook's own tabs, so a new Setup tab matches what the pages show today."""
-    cur = {}
-    def rows(name):
-        if name not in wb.sheetnames:
-            return []
-        data = list(wb[name].values)
-        if not data:
-            return []
-        hdr = [str(h).strip() if h is not None else "" for h in data[0]]
-        return [dict(zip(hdr, r)) for r in data[1:]]
-    for r in rows(SHEET_ASSUMPTIONS):
-        if r.get("Parameter") in ("Report title", "Classification") and clean_str(r.get("Value")):
-            cur[r["Parameter"]] = clean_str(r["Value"])
-    leaders, contacts = [], {}
-    for r in rows(SHEET_TEAM):
-        typ = clean_str(r.get("Type")).lower()
-        if typ == "team name": cur["Team name"] = clean_str(r.get("Name"))
-        elif typ == "summary": cur["Team summary"] = clean_str(r.get("Note")) or clean_str(r.get("Name"))
-        elif typ == "members": cur["Members"] = clean_str(r.get("Name"))
-        elif typ == "leader": leaders.append(r)
-        elif typ == "key contact": contacts[norm_territory(clean_str(r.get("Territory")))] = r
-    for i, l in enumerate(leaders[:5], 1):
-        cur[f"Leader {i} - Name"], cur[f"Leader {i} - Role"], cur[f"Leader {i} - Note"] = (clean_str(l.get(k)) for k in ("Name", "Role", "Note"))
-    for t, k in contacts.items():
-        cur[f"{t} - Name"], cur[f"{t} - Role"] = clean_str(k.get("Name")), clean_str(k.get("Role"))
-    smap = {"meeting": "Meeting", "title": "Story title", "subtitle": "Story subtitle", "presenter": "Presenter"}
-    for r in rows(SHEET_STORY):
-        k = smap.get(clean_str(r.get("Section")).lower())
-        if k and clean_str(r.get("Text")): cur[k] = clean_str(r.get("Text"))
-    if CONTACT_NAME: cur["Contact name"] = CONTACT_NAME
-    if CONTACT_EMAIL: cur["Contact email"] = CONTACT_EMAIL
-    return cur
-
-
-def add_setup_tab(wb):
-    cur = setup_prefill(wb)
-    ws = wb.create_sheet(SHEET_SETUP, 0)
-    ws.append(["Section", "Field", "Value", "Where it appears"])
-    yellow, grey = PatternFill("solid", fgColor="FFF2CC"), PatternFill("solid", fgColor="F2F2F2")
-    for sec, field, default, where in setup_fields():
-        ws.append([sec, field, cur.get(field, default), where])
-    ws.append([]); ws.append(["Also check", "Tab", "", "What to replace"])
-    for tab, what in SETUP_ALSO_CHECK:
-        ws.append(["Also check", tab, "", what])
-    style_sheet(ws, [14, 26, 60, 62], ORANGE)
-    for r in ws.iter_rows(min_row=2):
-        if r[0].value and r[0].value != "Also check":
-            r[2].fill = yellow
-            if clean_str(r[2].value).lower() in SETUP_PLACEHOLDERS:
-                r[2].font = Font(bold=True, color="C00000")      # placeholder still to replace
-        elif r[0].value == "Also check":
-            for c in r: c.fill = grey
-    ws.sheet_properties.tabColor = "FFC000"
-    note = ws.cell(row=1, column=6, value="Fill the yellow Value cells (red text = placeholder still to replace). "
-                                          "Values here override the Team, Story and Assumptions tabs. Blank = use those tabs.")
-    note.font = Font(italic=True, color="7D7D7D"); note.alignment = Alignment(wrap_text=True, vertical="top")
-    ws.column_dimensions["F"].width = 46
-
-
 def read_setup(df):
+    if isinstance(df, dict):
+        return df
     if df is None or "Field" not in df.columns:
         return {}
     return {clean_str(f): clean_str(v) for sec, f, v in zip(df.get("Section", [""] * len(df)), df["Field"], df.get("Value", [""] * len(df)))
@@ -440,7 +341,7 @@ def load(excel_path):
                 assum[clean_str(r["Parameter"])] = r["Value"]
     wrn_cat = xl.parse(SHEET_WRN_CAT, dtype=str) if SHEET_WRN_CAT in xl.sheet_names else pd.DataFrame()
     inputs = {name: xl.parse(name).rename(columns=lambda c: str(c).strip()).dropna(how="all")
-              for name in (SHEET_TAG_MAP, SHEET_TEAM, SHEET_SERVICES, SHEET_THEMES, SHEET_STORY, SHEET_PRESETS, SHEET_SETUP)
+              for name in (SHEET_TAG_MAP, SHEET_TEAM, SHEET_SERVICES, SHEET_THEMES, SHEET_STORY, SHEET_PRESETS, SHEET_SETUP, SHEET_TEAMSHEET)
               if name in xl.sheet_names}
     return raw, staff, model, callouts, assum, wrn_cat, inputs
 
@@ -457,8 +358,80 @@ def to_share(v, default=None):
     return x / 100 if abs(x) > 1.5 or str(v).strip().endswith("%") else x
 
 
+def item_key(v):
+    s = clean_str(v)
+    return s[:-2] if re.fullmatch(r"\d+\.0", s) else s
+
+
+def read_team_sheet(df, assum):
+    """The Team Sheet -> tag map, page content, story text, presets, branding/contact values. Updates assum in place."""
+    team = {"teamName": "", "summary": "", "members": "", "leaders": [], "keyContacts": [], "currentServices": [],
+            "futureServices": [], "frameworks": [], "databases": [], "aiTools": []}
+    themes = {"title": "Our Work Across Key Energy Transition Themes", "items": []}
+    story, presets, setup, tmap, theme_map, todo = {}, [], {}, {}, {}, []
+    lists = {"ask": "ask", "win for us": "winUS", "win for ac": "winAC"}
+    tools = {"esg framework": "frameworks", "database": "databases", "ai tool": "aiTools", "digital & ai tool": "aiTools"}
+    settings_num = {"fy start month": int, "scenario window (months)": int, "annual capacity hours": float}
+    for _, r in df.iterrows():
+        sec, item = clean_str(r.get("Section")).lower(), item_key(r.get("Item"))
+        v, d1, d2, d3 = (clean_str(r.get(c)) for c in ("Value", "Detail 1", "Detail 2", "Detail 3"))
+        if not sec or sec == "also check":
+            continue
+        for x in (v, d1, d2):
+            if x.lower() in SETUP_PLACEHOLDERS:
+                todo.append(f"{r.get('Section')}: {item}")
+                break
+        il = item.lower()
+        if sec in ("branding", "contact"):
+            if il == "energy transition page title":
+                themes["title"] = v or themes["title"]
+            else:
+                setup[item] = v
+        elif sec == "team":
+            key = {"team name": "teamName", "team summary": "summary", "members": "members"}.get(il)
+            if key: team[key] = v
+        elif sec == "leader" and v:
+            team["leaders"].append({"name": v, "role": d1, "note": d2})
+        elif sec == "key contact" and v:
+            team["keyContacts"].append({"territory": norm_territory(item), "name": v, "role": d1})
+        elif sec == "service" and v:
+            team["futureServices" if il.startswith("future") else "currentServices"].append(v)
+        elif sec == "tool" and v and il in tools:
+            team[tools[il]].append(v)
+        elif sec == "story":
+            if il in ("meeting", "title", "subtitle", "presenter"): story[il] = v
+            elif il in lists and v: story.setdefault(lists[il], []).append(v)
+            elif il == "next step" and (v or d1): story.setdefault("steps", []).append([v, d1, d2])
+        elif sec == "et theme":
+            theme_map.setdefault(item, {"title": "", "tagline": "", "points": []}).update(title=v, tagline=d1)
+        elif sec == "et work area" and v:
+            theme_map.setdefault(item, {"title": "", "tagline": "", "points": []})["points"].append([v, d1])
+        elif sec == "setting":
+            raw_v = r.get("Value")
+            if il == "tagging threshold": assum["Tagging threshold"] = to_share(raw_v, assum.get("Tagging threshold"))
+            elif il in settings_num and clean_str(raw_v):
+                try: assum[item if item in DEFAULT_ASSUMPTIONS else item] = settings_num[il](float(raw_v))
+                except (TypeError, ValueError): pass
+            elif clean_str(raw_v):
+                assum[item] = raw_v
+        elif sec == "scenario preset" and item:
+            presets.append({"name": item, "threshold": to_share(r.get("Value")),
+                            "window": int(float(r.get("Detail 1"))) if clean_str(r.get("Detail 1")) else None,
+                            "growth": to_share(r.get("Detail 2"), 0.0),
+                            "method": "best" if "seat" in d3.lower() else "hourly"})
+        elif sec == "tag mapping" and item:
+            tmap[item.lower()] = norm_territory(v) if v else ""
+    themes["items"] = [theme_map[k] for k in sorted(theme_map, key=lambda k: (len(k), k))]
+    if setup.get("Report title"): assum["Report title"] = setup["Report title"]
+    if setup.get("Classification"): assum["Classification"] = setup["Classification"]
+    return {"tagMap": tmap, "content": {"team": team, "themes": themes}, "story": story,
+            "presets": presets or None, "setup": setup, "todo": todo}
+
+
 def read_inputs(inputs, assum):
-    """Turn the optional input tabs into: tag map, page content, story text, scenario presets."""
+    """Turn the input tabs into: tag map, page content, story text, scenario presets."""
+    if SHEET_TEAMSHEET in inputs:                          # one sheet holds everything
+        return read_team_sheet(inputs[SHEET_TEAMSHEET], assum)
     out = {"tagMap": {}, "content": None, "story": None, "presets": None}
     df = inputs.get(SHEET_TAG_MAP)
     if df is not None and "Home Sub LOS 2" in df.columns:
@@ -674,7 +647,8 @@ def build_payload(raw, staff, model, callouts, assum, wrn_cat, inputs, source_na
                "staff": [smap[n] for n in staff_names], "teams": teams, "flags": flags, "categories": cats,
                "projects": projects, "rows": rows, "model": model_rates, "callouts": calls,
                "content": inp["content"], "storyInput": inp["story"],
-               "setupInput": (inputs or {}).get(SHEET_SETUP)}   # read by apply_setup, removed before writing
+               "setupInput": inp.get("setup") if "setup" in inp else (inputs or {}).get(SHEET_SETUP),   # read by apply_setup, removed before writing
+               "todoInput": inp.get("todo")}
 
     report = {
         "rows used": len(rows), "rows dropped (no month/hours/staff/territory)": dropped,
@@ -694,90 +668,6 @@ def build_payload(raw, staff, model, callouts, assum, wrn_cat, inputs, source_na
 
 
 # ============================================================ input tabs in Excel ===
-def tables(wb):
-    """Return {sheet name: (rows, column widths, note)} for every input tab."""
-    team, themes = DEFAULT_CONTENT["team"], DEFAULT_CONTENT["themes"]
-    story = STORY
-    out = {}
-
-    # Tag Mapping: every Home Sub LOS 2 value found in Staff Master
-    tags = []
-    if SHEET_STAFF in wb.sheetnames:
-        sm = pd.DataFrame(wb[SHEET_STAFF].values)
-        if len(sm):
-            sm.columns = [str(c).strip() for c in sm.iloc[0]]; sm = sm.iloc[1:]
-            if "Home Sub LOS 2" in sm.columns:
-                tags = sorted({str(v).strip() for v in sm["Home Sub LOS 2"].dropna() if str(v).strip()})
-    def guess(tag):
-        for pat, terr in TAG_KEYWORDS.items():
-            if re.search(pat, tag, re.I):
-                return terr
-        return ""
-    out[SHEET_TAG_MAP] = ([["Home Sub LOS 2", "Territory"]] + [[t, guess(t)] for t in tags],
-                             [36, 16], "Which territory each Home Sub LOS 2 tag means. Leave Territory blank for tags that are not a territory (e.g. Other Territory, Deals).")
-
-    rows = [["Type", "Name", "Role", "Territory", "Note"],
-            ["Team name", team.get("teamName", ""), "", "", ""],
-            ["Summary", "", "", "", team.get("summary", "")],
-            ["Members", team.get("members", ""), "", "", ""]]
-    rows += [["Leader", l.get("name", ""), l.get("role", ""), "", l.get("note", "")] for l in team.get("leaders", [])]
-    rows += [["Key contact", k.get("name", ""), k.get("role", ""), k.get("territory", ""), ""] for k in team.get("keyContacts", [])]
-    out[SHEET_TEAM] = (rows, [14, 26, 20, 14, 70], "Type must be one of: Team name, Summary, Members, Leader, Key contact. Add or delete Leader / Key contact rows freely.")
-
-    rows = [["Category", "Item"]]
-    for cat, key in [("Current service", "currentServices"), ("Future service", "futureServices"), ("ESG framework", "frameworks"),
-                     ("Database", "databases"), ("Digital & AI tool", "aiTools")]:
-        rows += [[cat, x] for x in team.get(key, [])]
-    out[SHEET_SERVICES] = (rows, [20, 50], "Category must be one of: Current service, Future service, ESG framework, Database, Digital & AI tool.")
-
-    rows = [["Theme No", "Theme Title", "Tagline", "Work Area", "Description"]]
-    for i, it in enumerate(themes.get("items", []), 1):
-        for j, (a, d) in enumerate(it.get("points", [])):
-            rows.append([i, it["title"] if j == 0 else "", it["tagline"] if j == 0 else "", a, d])
-    out[SHEET_THEMES] = (rows, [10, 34, 40, 30, 60], "One row per work area. Theme Title and Tagline only need filling on the first row of each theme. Up to 4 themes are shown.")
-
-    rows = [["Section", "Text", "Heading", "Detail"]]
-    for k in ("title", "subtitle", "meeting", "presenter"):
-        if story.get(k): rows.append([k.capitalize(), story[k], "", ""])
-    rows += [["Ask", x, "", ""] for x in story.get("ask", [])]
-    rows += [["Win for US", x, "", ""] for x in story.get("winUS", [])]
-    rows += [["Win for AC", x, "", ""] for x in story.get("winAC", [])]
-    rows += [["Next step", w, t, d] for w, t, d in story.get("steps", [])]
-    out[SHEET_STORY] = (rows, [14, 70, 34, 60], "Section: Title, Subtitle, Meeting, Presenter, Ask, Win for US, Win for AC, Next step. For Next step, Text = when (e.g. 'Now').")
-
-    rows = [["Name", "Tagging threshold", "Look-back months", "US volume change next year", "Costing method"]]
-    for p in SCENARIO_PRESETS:
-        rows.append([p["name"], p["threshold"], p["window"], p["growth"], "Hourly or seat" if p["method"] == "best" else "Hourly"])
-    out[SHEET_PRESETS] = (rows, [16, 18, 18, 26, 18], "Blank threshold / look-back = use the Assumptions tab. Costing method: Hourly, or Hourly or seat.")
-    return out
-
-
-README = [
-    ["Tab", "What it is", "Who updates it", "How"],
-    [SHEET_SETUP, "Names, titles, logo, contacts, team and story cover - everything shown on the pages", "Once, then as people change", "Fill the yellow cells; red text = placeholder still to replace"],
-    [SHEET_RAW, "Time entries (one row per entry)", "Monthly export", "Paste the new export; keep the column headers"],
-    [SHEET_STAFF, "People: level, team, Home Sub LOS 2 tag, sales price", "When people join, move or rates change", "One row per person; 'Sales Price' or 'Sales Price 2025', 'Sales Price 2026'..."],
-    [SHEET_MODEL, "Global Model rate card (Rate/hr, Cost/Person by level)", "Once a year", "Levels must match Staff Master (SM, M, SA, A...)"],
-    [SHEET_CALLOUTS, "Milestones shown on the monthly chart", "As needed", "Month as Mon-YY, e.g. Feb-25"],
-    [SHEET_ASSUMPTIONS, "Settings: FY start, tagging threshold, look-back, titles", "Rarely", "Change the Value column only"],
-    [SHEET_WRN_CAT, "ESG or ET per Work Request No.", "When new WRNs appear", "Fills blank ESG/ET cells in the raw data"],
-    [SHEET_TAG_MAP, "Which territory each Home Sub LOS 2 tag means", "When a new tag appears", "Blank Territory = not a territory tag"],
-    [SHEET_TEAM, "Team overview: leaders, members, key contacts", "As the team changes", "See the note on the tab"],
-    [SHEET_SERVICES, "Services, frameworks, databases, AI tools", "As needed", "See the note on the tab"],
-    [SHEET_THEMES, "Energy Transition themes page", "As needed", "See the note on the tab"],
-    [SHEET_STORY, "Text of the partner story page", "Before each meeting", "See the note on the tab"],
-    [SHEET_PRESETS, "Scenario presets (Conservative / Base / Growth)", "As needed", "See the note on the tab"],
-    ["", "", "", ""],
-    ["After editing", "Save and close the workbook, then run:  py build.py   (or double-click build.py)", "", ""],
-]
-EXTRA_ASSUMPTIONS = [
-    ("Report title", REPORT_TITLE, "Title at the top of the dashboard."),
-    ("Classification", CLASSIFICATION, "Shown in the header and footer of both pages."),
-    ("Energy Transition page title", "Our Work Across Key Energy Transition Themes", "Heading of the Energy Transition tab."),
-    ("Current tagging", DEFAULT_TAGGING_NOTE, "Shown in the assumptions on both pages. Update once people are tagged to territories."),
-]
-
-
 def style_sheet(ws, widths, header_fill=CHARCOAL):
     for c in ws[1]:
         c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor=header_fill)
@@ -791,54 +681,127 @@ def style_sheet(ws, widths, header_fill=CHARCOAL):
 
 
 
+def guess_tag(tag):
+    for pat, terr in TAG_KEYWORDS.items():
+        if re.search(pat, tag, re.I):
+            return terr
+    return ""
+
+
+def effective_config(path):
+    """What the pages show today from the workbook's tabs (any older layout) or the built-in defaults."""
+    raw, staff, model, callouts, assum, wrn, inputs = load(path)
+    a = dict(assum)
+    inp = read_inputs(inputs, a)
+    content = json.loads(json.dumps(inp["content"] or DEFAULT_CONTENT))
+    story = {**STORY, **{k: v for k, v in (inp["story"] or {}).items() if v}}
+    presets = inp["presets"] or SCENARIO_PRESETS
+    tags = sorted({clean_str(t) for t in staff["Home Sub LOS 2"] if clean_str(t)}) if "Home Sub LOS 2" in staff.columns else []
+    meta = {"title": clean_str(a.get("Report title"), REPORT_TITLE), "classification": clean_str(a.get("Classification"), CLASSIFICATION),
+            "contact": {"people": [{"name": n, "email": e} for n, e in ((CONTACT_NAME, CONTACT_EMAIL), (CONTACT_NAME_2, CONTACT_EMAIL_2)) if n or e]}}
+    setup = read_setup(inputs.get(SHEET_SETUP))
+    apply_setup({"meta": meta, "content": content, "story": story}, setup)
+    return a, content, story, presets, inp["tagMap"], tags, setup, meta
+
+
+def team_sheet_rows(path):
+    a, content, story, presets, tagmap, tags, setup, meta = effective_config(path)
+    t, th, R = content["team"], content["themes"], []
+    def add(sec, item, val="", d1="", d2="", d3="", note=""):
+        R.append([sec, item, val, d1, d2, d3, note])
+    add("Branding", "Report title", meta["title"], note="Title at the top of the dashboard")
+    add("Branding", "Summary title", meta.get("summaryTitle", "ESG Delivery: Summary"), note="Title of the one-page summary")
+    add("Branding", "Header subtitle", meta.get("headerSubtitle", "Sustainability & ESG Delivery"), note="Next to the logo on the dashboard")
+    add("Branding", "Classification", meta["classification"], note="Header and footer of every page, e.g. 'Company Confidential | Internal use only'")
+    add("Branding", "Logo file", setup.get("Logo file") or LOGO_FILE, note="Logo file next to build.py, or a full path (PNG, JPG or SVG)")
+    add("Branding", "Logo text", setup.get("Logo text") or LOGO_TEXT or "Your Organisation", note="Shown instead of the logo when the file is missing")
+    add("Branding", "Energy Transition page title", th.get("title", ""), note="Heading of the Energy Transition tab")
+    ppl = meta["contact"]["people"] + [{}, {}]
+    add("Contact", "Contact name", ppl[0].get("name") or "Your Name", note="Last line of the pages: 'please reach out to ...'")
+    add("Contact", "Contact email", ppl[0].get("email") or "you@example.com", note="Shown in brackets after the name")
+    add("Contact", "Contact name 2", ppl[1].get("name", ""), note="Optional second contact")
+    add("Contact", "Contact email 2", ppl[1].get("email", ""), note="Optional")
+    add("Team", "Team name", t.get("teamName", ""), note="Who we are")
+    add("Team", "Team summary", t.get("summary", ""), note="Quote under 'Meet the team'")
+    add("Team", "Members", t.get("members", ""), note="e.g. '6 Members'")
+    leaders = t.get("leaders", [])
+    for i in range(max(5, len(leaders))):
+        l = leaders[i] if i < len(leaders) else {}
+        add("Leader", i + 1, l.get("name", ""), l.get("role", ""), l.get("note", ""),
+            note="Value = name, Detail 1 = role, Detail 2 = note. Blank name = not shown" if i == 0 else "")
+    have = {k["territory"]: k for k in t.get("keyContacts", [])}
+    for terr in TERRITORY_ORDER + [x for x in have if x not in TERRITORY_ORDER]:
+        k = have.get(terr, {})
+        add("Key contact", terr, k.get("name", ""), k.get("role", ""), note="Value = name, Detail 1 = role. Blank = not shown" if terr == TERRITORY_ORDER[0] else "")
+    for x in t.get("currentServices", []): add("Service", "Current", x)
+    for x in t.get("futureServices", []): add("Service", "Future", x)
+    for key, label in (("frameworks", "ESG framework"), ("databases", "Database"), ("aiTools", "AI tool")):
+        for x in t.get(key, []): add("Tool", label, x)
+    for k, label in (("meeting", "Meeting"), ("title", "Title"), ("subtitle", "Subtitle"), ("presenter", "Presenter")):
+        add("Story", label, story.get(k, ""), note={"Presenter": "Cover and footer of the story"}.get(label, "Story cover"))
+    for x in story.get("ask", []): add("Story", "Ask", x)
+    for x in story.get("winUS", []): add("Story", "Win for US", x)
+    for x in story.get("winAC", []): add("Story", "Win for AC", x)
+    for w, h, d in story.get("steps", []): add("Story", "Next step", w, h, d, note="Value = when, Detail 1 = heading, Detail 2 = detail")
+    for i, it in enumerate(th.get("items", []), 1):
+        add("ET theme", i, it.get("title", ""), it.get("tagline", ""), note="Value = theme title, Detail 1 = tagline (up to 4 themes)")
+        for wa, desc in it.get("points", []): add("ET work area", i, wa, desc, note="Item = theme number, Value = work area, Detail 1 = description")
+    for k in ("FY start month", "Tagging threshold", "Scenario window (months)", "Annual capacity hours", "Training month"):
+        add("Setting", k, a.get(k, DEFAULT_ASSUMPTIONS.get(k, "")), note={"FY start month": "7 = July (FY27 = Jul-26 to Jun-27); 1 = calendar year",
+            "Tagging threshold": "Tag a person to a territory at this share of their hours", "Scenario window (months)": "Look-back for the tagging scenario",
+            "Annual capacity hours": "Hours in one full-time seat", "Training month": "Pre/post training split"}[k])
+    add("Setting", "Current tagging", a.get("Current tagging", DEFAULT_TAGGING_NOTE), note="Sentence shown in the assumptions on every page")
+    for p in presets:
+        add("Scenario preset", p["name"], p["threshold"] if p["threshold"] is not None else "", p["window"] if p["window"] is not None else "",
+            p["growth"], "Hourly or seat" if p["method"] == "best" else "Hourly",
+            note="Value = threshold (blank = Setting), Detail 1 = look-back months, Detail 2 = US volume change, Detail 3 = Hourly / Hourly or seat")
+    for tag in tags:
+        add("Tag mapping", tag, tagmap.get(tag.lower(), guess_tag(tag)), note="Territory this Home Sub LOS 2 tag means (blank = not a territory)")
+    for tab, what in (("Global Model FY27 CPP", "Rate card: your real Rate/hr and Cost/Person by level"),
+                      ("Staff Master", "People, levels, sales prices, Home Sub LOS 2 tags (your export)"),
+                      ("Project Hours Raw Data", "Time entries (your export)"), ("Callouts", "Milestones on the monthly chart")):
+        add("Also check", tab, note=what)
+    return R
+
+
+def add_team_sheet(wb, rows):
+    ws = wb.create_sheet(SHEET_TEAMSHEET, 0)
+    ws.append(TS_COLS)
+    yellow, grey = PatternFill("solid", fgColor="FFF2CC"), PatternFill("solid", fgColor="F2F2F2")
+    prev = None
+    for r in rows:
+        if prev is not None and r[0] != prev:
+            ws.append([])                                          # blank line between sections
+        ws.append(r); prev = r[0]
+        row = ws[ws.max_row]
+        row[0].font = Font(bold=True)
+        row[6].font = Font(italic=True, color="7D7D7D")
+        for c in row[2:6]:
+            c.fill = grey if r[0] == "Also check" else yellow
+            if clean_str(c.value).lower() in SETUP_PLACEHOLDERS:
+                c.font = Font(bold=True, color="C00000")
+    style_sheet(ws, [16, 26, 54, 34, 34, 18, 60], ORANGE)
+    for row in ws.iter_rows(min_row=2):
+        row[0].font = Font(bold=True)
+        if row[6].value: row[6].font = Font(italic=True, color="7D7D7D")
+        for c in row[2:6]:
+            if clean_str(c.value).lower() in SETUP_PLACEHOLDERS: c.font = Font(bold=True, color="C00000")
+    ws.sheet_properties.tabColor = "FFC000"
+    note = ws.cell(row=1, column=9, value="This is the only sheet you need to edit. Fill the yellow cells; red text = placeholder "
+                                          "still to replace. Add rows anywhere (keep the Section name). Data tabs: raw hours, "
+                                          "Staff Master, rate card, Callouts, WRN Category.")
+    note.font = Font(italic=True, color="7D7D7D"); note.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.column_dimensions["I"].width = 46
+
+
 def ensure_input_tabs(path):
-    """Add any missing input tabs (pre-filled). Saves only if something was added; keeps one backup."""
+    """Add the Team Sheet if missing (pre-filled from the workbook). Saves only then; keeps one backup."""
     wb = load_workbook(path)
-    added = []
-
-    for name, (rows, widths, note) in tables(wb).items():
-        if name in wb.sheetnames:
-            continue
-        ws = wb.create_sheet(name)
-        for r in rows:
-            ws.append(r)
-        style_sheet(ws, widths, ORANGE)
-        ws.sheet_properties.tabColor = ORANGE
-        nc = ws.cell(row=1, column=len(rows[0]) + 2, value="How to fill: " + note)   # beside the table, so it is never read as data
-        nc.font = Font(italic=True, color="7D7D7D"); nc.alignment = Alignment(wrap_text=True, vertical="top")
-        ws.column_dimensions[get_column_letter(len(rows[0]) + 2)].width = 48
-        added.append(name)
-
-    # Assumptions: add the title rows if missing
-    if SHEET_ASSUMPTIONS in wb.sheetnames:
-        ws = wb[SHEET_ASSUMPTIONS]
-        have = {str(r[0].value).strip() for r in ws.iter_rows(min_row=2) if r[0].value}
-        for p, v, n in EXTRA_ASSUMPTIONS:
-            if p not in have:
-                ws.append([p, v, n]); added.append(f"Assumptions: {p}")
-    else:
-        ws = wb.create_sheet(SHEET_ASSUMPTIONS)
-        ws.append(["Parameter", "Value", "Notes"])
-        for p, v in DEFAULT_ASSUMPTIONS.items():
-            ws.append([p, v, ""])
-        for p, v, n in EXTRA_ASSUMPTIONS:
-            ws.append([p, v, n])
-        style_sheet(ws, [30, 40, 70]); added.append(SHEET_ASSUMPTIONS)
-
-    if SHEET_SETUP not in wb.sheetnames:
-        add_setup_tab(wb); added.append(SHEET_SETUP)
-
-    if "README" not in wb.sheetnames:
-        ws = wb.create_sheet("README", 1 if SHEET_SETUP in wb.sheetnames else 0)
-        for r in README:
-            ws.append(r)
-        style_sheet(ws, [26, 52, 30, 70], ORANGE)
-        ws.sheet_properties.tabColor = CHARCOAL
-        added.append("README")
-
-    if not added:
-        print("Input tabs: all present, workbook not changed")
+    if SHEET_TEAMSHEET in wb.sheetnames:
+        old = [x for x in OLD_INPUT_TABS if x in wb.sheetnames]
+        print("Team Sheet: found" + (f" (older tabs no longer used, safe to delete: {', '.join(old)})" if old else ""))
         return
+    add_team_sheet(wb, team_sheet_rows(path))
     backup = path.with_name(path.stem + " (backup before input tabs)" + path.suffix)
     if not backup.exists():
         shutil.copy2(path, backup)     # keep the original once, in case Excel features need restoring
@@ -846,8 +809,9 @@ def ensure_input_tabs(path):
         wb.save(path)
     except PermissionError:
         sys.exit(f"Could not save {path.name} - close it in Excel and run again.")
-    print("Input tabs added:", ", ".join(added), f"(original kept as '{backup.name}')")
-
+    old = [x for x in OLD_INPUT_TABS if x in wb.sheetnames]
+    print(f"Team Sheet added, pre-filled from the workbook (original kept as '{backup.name}')." +
+          (f" Older tabs no longer used, safe to delete: {', '.join(old)}" if old else ""))
 
 
 # ================================================================== write pages ===
@@ -893,7 +857,7 @@ def main():
     out_dir = Path(args.out_dir).expanduser(); out_dir.mkdir(parents=True, exist_ok=True)
     tpl = load_templates()
 
-    print(f"Workbook: {excel.name}\n\n[1/3] Checking input tabs ...")
+    print(f"Workbook: {excel.name}\n\n[1/3] Checking the Team Sheet ...")
     ensure_input_tabs(excel)
 
     print("\n[2/3] Reading the data ...")
@@ -903,11 +867,14 @@ def main():
     payload["story"] = {**STORY, **{k: v for k, v in (payload.get("storyInput") or {}).items() if v}}
     payload["meta"].update(dashboard=DASHBOARD_FILE, today=datetime.now().strftime("%B %Y"),
                            summary=SUMMARY_FILE if "SUMMARY" in tpl else None)
+    todo_sheet = payload.pop("todoInput", None)
     todo = apply_setup(payload, read_setup(payload.pop("setupInput", None)))
+    if todo_sheet is not None:
+        todo = todo_sheet
     print("Data check")
     for k, v in report.items():
         print(f"  {k:<45} {v}")
-    print(f"  {'Setup tab: still to fill':<45} {', '.join(todo) if todo else 'nothing - all placeholders replaced'}")
+    print(f"  {'Team Sheet: still to fill':<45} {', '.join(todo) if todo else 'nothing - all placeholders replaced'}")
 
     print("\n[3/3] Writing the pages ...")
     chart_tag = "<script>" + tpl["CHARTJS"].strip() + "\n</script>"

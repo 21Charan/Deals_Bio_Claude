@@ -1725,6 +1725,22 @@ select{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--borde
 .credit .big small{display:block;font:12px Arial;color:var(--text-2);margin-top:4px}
 .credit p{margin:0;font-size:14px}
 .basis{font-size:12px;color:var(--text-3);margin-top:10px}
+.ctls{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end;margin-bottom:14px}
+.ctls label{display:block;font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:5px}
+.ctls .sh{min-width:220px}
+.ctls .sh span{font:700 15px var(--head);color:var(--orange);margin-left:6px}
+input[type=range]{width:100%;accent-color:var(--orange)}
+.scn{grid-template-columns:repeat(4,1fr)}
+.ptable{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;margin-top:12px}
+.ptable th,.ptable td{padding:7px 9px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.ptable th{background:var(--charcoal);color:#fff;font-size:12px;position:sticky;top:0;z-index:1}
+.ptable td.n,.ptable th.n{text-align:right}
+.ptable tbody tr{cursor:pointer}
+.ptable tbody tr:hover td{background:var(--soft)}
+.ptable tr.sel td{background:var(--peach);font-weight:700}
+.ptable tr.tot td{font-weight:700;border-top:2px solid var(--charcoal);cursor:pointer;background:#fff;position:sticky;bottom:0}
+.tw{overflow-x:auto;max-height:420px;overflow-y:auto}
+.hbar{display:inline-block;height:8px;border-radius:2px;background:var(--orange);vertical-align:middle;margin-right:6px}
 footer{max-width:1240px;margin:0 auto;padding:14px 28px 26px;color:var(--text-3);font-size:12px}
 .legal{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px}
 .legal b{color:var(--text)}
@@ -1734,8 +1750,8 @@ footer{max-width:1240px;margin:0 auto;padding:14px 28px 26px;color:var(--text-3)
 .rv{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
 .rv.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none} .fill{transition:none}}
-@media (max-width:980px){.who,.tl,.val,.points{grid-template-columns:1fr 1fr} .contacts{grid-template-columns:1fr}}
-@media (max-width:640px){.who,.tl,.val,.points{grid-template-columns:1fr} main,.brandbar .in,footer{padding-left:16px;padding-right:16px}}
+@media (max-width:980px){.who,.tl,.val,.points,.scn{grid-template-columns:1fr 1fr} .contacts{grid-template-columns:1fr}}
+@media (max-width:640px){.who,.tl,.val,.points,.scn{grid-template-columns:1fr} main,.brandbar .in,footer{padding-left:16px;padding-right:16px}}
 @media print{body{background:#fff} .navlink,.seg,select{display:none} .rv{opacity:1 !important;transform:none !important} .block{break-inside:avoid}}
 </style>
 /*__CHARTJS__*/
@@ -1782,6 +1798,21 @@ footer{max-width:1240px;margin:0 auto;padding:14px 28px 26px;color:var(--text-3)
       <div class="bars" id="valBars"></div>
       <div class="credit" id="valCredit"></div>
       <div class="basis" id="valBasis"></div>
+    </div>
+  </section>
+  <section class="block rv">
+    <div class="bh"><span class="num">5</span><h2>Scenario: using the credit hours</h2><span class="note">Pick the hours, the people and how much of them is used</span></div>
+    <div class="card">
+      <div class="ctls">
+        <div><label>Hours basis</label><div class="seg" id="scBasis"><button data-v="credit" class="on">Credit hours (non-US)</button><button data-v="all">All hours</button></div></div>
+        <div><label for="scPerson">Person</label><select id="scPerson"></select></div>
+        <div class="sh"><label for="scShare">Share of these hours used <span id="scShareV"></span></label><input type="range" id="scShare" min="0" max="100" step="5" value="100"></div>
+        <div><label for="scPeriod">Period</label><select id="scPeriod"></select></div>
+      </div>
+      <div class="grid scn" id="scTiles"></div>
+      <div class="bars" id="scBars" style="margin-top:14px"></div>
+      <div class="tw"><table class="ptable" id="scTable"></table></div>
+      <div class="basis" id="scBasisNote"></div>
     </div>
   </section>
 </main>
@@ -1928,7 +1959,59 @@ function renderValue() {
 }
 el("valPeriod").addEventListener("change", renderValue);
 
-renderTimeline("FY"); renderValue();
+// ---------- 5. scenario: credit (non-US) or all hours, one person or everyone, share used
+const SC = {basis: "credit", person: "all", share: 1};
+el("scPeriod").innerHTML = el("valPeriod").innerHTML;
+function perPerson(pred) {
+  const P = S.map((s, i) => ({i, name: s.name, level: s.level, h: 0, cur: 0, model: 0, priced: 0}));
+  for (const r of R) {
+    if (!pred(r) || (SC.basis === "credit" && r[ri_t] === US)) continue;
+    const p = P[r[ri_s]], h = r[ri_h], sp = rateOf(r[ri_s], cy(r[ri_m])), mr = modelRate(r[ri_s]);
+    p.h += h;
+    if (sp != null && mr != null) { p.priced += h; p.cur += h * sp; p.model += h * mr; }
+  }
+  return P.filter(p => p.h > 0).sort((a, b) => b.h - a.h);
+}
+function renderScenario() {
+  el("scBasis").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === SC.basis));
+  el("scShareV").textContent = Math.round(SC.share * 100) + "%";
+  const P = perPerson(PERIODS[+el("scPeriod").value].pred), k = SC.share;
+  // person list follows the hours basis and period; keep the selection when possible
+  const opts = `<option value="all">All people (${P.length})</option>` + P.map(p => `<option value="${p.i}">${esc(p.name)} (${esc(p.level || "–")})</option>`).join("");
+  el("scPerson").innerHTML = opts;
+  if (SC.person !== "all" && !P.some(p => String(p.i) === SC.person)) SC.person = "all";
+  el("scPerson").value = SC.person;
+  const sel = SC.person === "all" ? P : P.filter(p => String(p.i) === SC.person);
+  const sum = f => sel.reduce((s, p) => s + f(p), 0);
+  const h = sum(p => p.h) * k, cur = sum(p => p.cur) * k, mod = sum(p => p.model) * k, diff = cur - mod;
+  const what = SC.basis === "credit" ? "credit (non-US) hours" : "hours", who = SC.person === "all" ? "all people" : esc(sel[0] ? sel[0].name : "");
+  const tile = (kk, v, d, c = "") => `<div class="card tile ${c}"><div class="k">${kk}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  el("scTiles").innerHTML =
+    tile("Hours in scenario", fH(h), `${Math.round(k * 100)}% of ${what}, ${who}`, "g") +
+    tile("At today's prices", fUSD(cur), "hours × sales price") +
+    tile("At Global Model rates", fUSD(mod), "hours × rate for the level") +
+    tile("Lower by", fUSD(diff), `${pct(cur ? diff / cur : null)} lower than today`, "o");
+  const max = Math.max(cur, mod, 1);
+  el("scBars").innerHTML = [["Today's prices", cur, css("--charcoal")], ["Global Model rates", mod, css("--orange")]]
+    .map(([n, v, c]) => `<div><div class="bl"><span>${n}</span><b>${fUSD(v)}</b></div><div class="track"><div class="fill" style="width:${(v / max * 100).toFixed(1)}%;background:${c}"></div></div></div>`).join("");
+  const hmax = Math.max(...P.map(p => p.h), 1);
+  const row = p => `<tr data-i="${p.i}" class="${String(p.i) === SC.person ? "sel" : ""}"><td>${esc(p.name)}</td><td>${esc(p.level || "–")}</td>
+    <td class="n"><span class="hbar" style="width:${Math.max(2, p.h / hmax * 70)}px"></span>${fH(p.h * k)}</td><td class="n">${p.priced ? fUSD(p.cur * k) : "–"}</td>
+    <td class="n">${p.priced ? fUSD(p.model * k) : "–"}</td><td class="n">${p.priced ? fUSD((p.cur - p.model) * k) : "–"}</td></tr>`;
+  const all = {h: P.reduce((s, p) => s + p.h, 0), cur: P.reduce((s, p) => s + p.cur, 0), model: P.reduce((s, p) => s + p.model, 0)};
+  el("scTable").innerHTML = `<thead><tr><th>Person</th><th>Level</th><th class="n">${SC.basis === "credit" ? "Credit hours" : "Hours"}</th><th class="n">Today's prices</th><th class="n">Global Model rates</th><th class="n">Lower by</th></tr></thead><tbody>` +
+    P.map(row).join("") + `<tr class="tot" data-i="all"><td>All people</td><td></td><td class="n">${fH(all.h * k)}</td><td class="n">${fUSD(all.cur * k)}</td><td class="n">${fUSD(all.model * k)}</td><td class="n">${fUSD((all.cur - all.model) * k)}</td></tr></tbody>`;
+  const unpriced = sel.reduce((s, p) => s + p.h - p.priced, 0) * k;
+  el("scBasisNote").textContent = `Credit hours = hours booked to non-US territories; share = the part of them assumed in the scenario. Click a row to focus on one person; click "All people" to go back.` +
+    (unpriced > 0.5 ? ` ${fH(unpriced)} hours have no price or level and are left out of the values.` : "");
+}
+el("scBasis").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { SC.basis = b.dataset.v; renderScenario(); } });
+el("scPerson").addEventListener("change", e => { SC.person = e.target.value; renderScenario(); });
+el("scShare").addEventListener("input", e => { SC.share = +e.target.value / 100; renderScenario(); });
+el("scPeriod").addEventListener("change", renderScenario);
+el("scTable").addEventListener("click", e => { const tr = e.target.closest("tr[data-i]"); if (!tr) return; SC.person = tr.dataset.i === SC.person ? "all" : tr.dataset.i; renderScenario(); });
+
+renderTimeline("FY"); renderValue(); renderScenario();
 // fade the blocks in, one after another
 document.querySelectorAll(".rv").forEach((b, k) => setTimeout(() => b.classList.add("in"), REDUCED ? 0 : 80 + k * 120));
 </script>
