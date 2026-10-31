@@ -1,7 +1,8 @@
 """
 ESG Territory Hours - one-file builder
 =====================================
-Reads one Excel workbook and writes two offline HTML pages:
+Reads one Excel workbook and writes three offline HTML pages:
+  ESG_Summary.html           one-page summary (who we are, key points, US vs Non-US hours, value of hours)
   ESG_Hours_Dashboard.html   full dashboard (territories, growth, rates, US tagging scenario planner)
   ESG_US_Story_v2.html       partner story (arrow keys move between sections)
 
@@ -31,6 +32,7 @@ CLASSIFICATION = "Confidential | Internal use only" # if the workbook has no 'Cl
 TEMPLATE_FILE = "template.html"
 DASHBOARD_FILE = "ESG_Hours_Dashboard.html"
 STORY_FILE = "ESG_US_Story_v2.html"
+SUMMARY_FILE = "ESG_Summary.html"      # one-page summary
 OPEN_WHEN_DONE = True                  # open the story page at the end
 # ==========================================================================
 try:
@@ -260,6 +262,7 @@ def setup_fields():
     leaders = team.get("leaders", []) + [{}] * 5
     contacts = {k["territory"]: k for k in team.get("keyContacts", [])}
     f = [("Branding", "Report title", REPORT_TITLE, "Title at the top of the dashboard"),
+         ("Branding", "Summary title", "ESG Delivery: Summary", "Title of the one-page summary"),
          ("Branding", "Header subtitle", "Sustainability & ESG Delivery", "Next to the logo on the dashboard"),
          ("Branding", "Classification", CLASSIFICATION, "Header and footer of both pages, e.g. 'Company Confidential | Internal use only'"),
          ("Branding", "Logo file", "logo.png", "Logo file next to build.py, or a full path (PNG, JPG or SVG)"),
@@ -372,6 +375,7 @@ def apply_setup(payload, setup):
     m, team, story = payload["meta"], payload["content"]["team"], payload["story"]
     if g("Report title"): m["title"] = g("Report title")
     if g("Classification"): m["classification"] = g("Classification")
+    m["summaryTitle"] = g("Summary title") or m.get("summaryTitle") or "ESG Delivery: Summary"
     m["headerSubtitle"] = g("Header subtitle") or m.get("headerSubtitle") or "Sustainability & ESG Delivery"
     if g("Logo file"): LOGO_FILE = g("Logo file")
     if g("Logo text"): LOGO_TEXT = g("Logo text")
@@ -897,7 +901,8 @@ def main():
     if payload["content"] is None:
         payload["content"] = DEFAULT_CONTENT
     payload["story"] = {**STORY, **{k: v for k, v in (payload.get("storyInput") or {}).items() if v}}
-    payload["meta"].update(dashboard=DASHBOARD_FILE, today=datetime.now().strftime("%B %Y"))
+    payload["meta"].update(dashboard=DASHBOARD_FILE, today=datetime.now().strftime("%B %Y"),
+                           summary=SUMMARY_FILE if "SUMMARY" in tpl else None)
     todo = apply_setup(payload, read_setup(payload.pop("setupInput", None)))
     print("Data check")
     for k, v in report.items():
@@ -909,6 +914,10 @@ def main():
     dash, story = out_dir / DASHBOARD_FILE, out_dir / STORY_FILE
     write_page(tpl["DASHBOARD"], chart_tag, payload, dash)
     write_page(tpl["STORY"], chart_tag, payload, story)
+    if "SUMMARY" in tpl:
+        summary = out_dir / SUMMARY_FILE
+        write_page(tpl["SUMMARY"], chart_tag, payload, summary)
+        print(f"  {summary}")
     print(f"  {dash}\n  {story}\n\nDone.")
     if OPEN_WHEN_DONE and not args.no_open:
         webbrowser.open(story.as_uri())

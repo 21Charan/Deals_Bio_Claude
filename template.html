@@ -33,6 +33,8 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Arial,Helvet
 .brandbar .cls{margin-left:auto;font-size:12px;color:var(--text-3)}
 .backlink{display:inline-flex;align-items:center;gap:6px;background:var(--orange);color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:7px 14px;border-radius:4px}
 .backlink:hover{background:#B23F02}
+.sumlink{display:inline-flex;align-items:center;text-decoration:none;font-weight:700;font-size:13px;color:var(--orange);border:1.5px solid var(--orange);border-radius:4px;padding:6px 12px;margin-right:8px}
+.sumlink:hover{background:var(--orange);color:#fff}
 header{padding:18px 28px 0;max-width:1400px;margin:0 auto}
 h1{font-family:var(--head);font-size:24px;margin:0;font-weight:700;letter-spacing:-.01em}
 .card h2,.kpi .v{font-family:var(--head)}
@@ -207,7 +209,7 @@ th.hl{background:var(--orange)}
 /*__CHARTJS__*/
 </head>
 <body>
-<div class="brandbar"><div class="in"><!--__LOGO__--><span class="div"></span><span class="sub" style="font-size:14px"><!--__SUBTITLE__--></span><span class="cls" id="clsTop"></span><a class="backlink" id="backLink" href="#" hidden>&#8592; Back to partner story</a></div></div>
+<div class="brandbar"><div class="in"><!--__LOGO__--><span class="div"></span><span class="sub" style="font-size:14px"><!--__SUBTITLE__--></span><span class="cls" id="clsTop"></span><a class="sumlink" id="sumLink" href="#" hidden>One-page summary</a><a class="backlink" id="backLink" href="#" hidden>&#8592; Back to partner story</a></div></div>
 <header>
   <h1 id="title">ESG Delivery: Territory Hours</h1>
   <div class="sub" id="subtitle"></div>
@@ -544,6 +546,7 @@ function renderStatic() {
   el("foot").textContent = `Generated ${D.meta.generated} from ${D.meta.source}. Hours by reporting month (Source Sheet).`;
   el("legalLeft").innerHTML = legalHtml(D.meta.classification);
   el("signText").innerHTML = signHtml();
+  if (D.meta.summary) { el("sumLink").href = D.meta.summary; el("sumLink").hidden = false; }
   if (D.meta.storyLink) {   // return to the section of the story the viewer came from (passed as #section)
     const from = (location.hash || "").replace("#", "");
     el("backLink").href = D.meta.storyLink + "#" + (/^[a-z]+$/.test(from) ? from : "appendix"); el("backLink").hidden = false;
@@ -1204,7 +1207,7 @@ footer b{color:var(--text)}
 /*__CHARTJS__*/
 </head>
 <body>
-<div class="topbar"><div class="in"><!--__LOGO__--><nav class="chapters" id="chapters"></nav><a class="dashlink" id="dashLink" href="#">Full dashboard &#8594;</a></div><div class="progress" id="progress"></div></div>
+<div class="topbar"><div class="in"><!--__LOGO__--><nav class="chapters" id="chapters"></nav><a class="dashlink" id="sumLink" href="#">Summary</a><a class="dashlink" id="dashLink" href="#">Full dashboard &#8594;</a></div><div class="progress" id="progress"></div></div>
 
 <section id="cover" data-title="Cover"><div class="wrap">
   <div class="cover-logo"><!--__LOGO__--></div>
@@ -1621,6 +1624,7 @@ function appendix() {
     Object.entries(MODEL).map(([lv, r]) => `<tr><td>${esc(r.name)}</td><td class="n">${fUSD(r.rate)}</td><td class="n">${fUSD(r.cpp)}</td><td class="n">${r.rate ? fH(r.cpp / (avgRate(lv) || r.rate)) + " hrs" : "–"}</td></tr>`).join("") + `</tbody></table>`;
   // both links carry the current section, so the dashboard's "Back" button returns here
   const current = () => { const y = scrollY + innerHeight * 0.4; let id = secs[0].id; for (const s of secs) if (s.offsetTop <= y) id = s.id; return id; };
+  if (D.meta.summary) el("sumLink").href = D.meta.summary; else el("sumLink").remove();
   [el("apLink"), el("dashLink")].forEach(a => { a.href = D.meta.dashboard; a.addEventListener("click", () => { a.href = D.meta.dashboard + "#" + current(); }); });
   el("ftLeft").innerHTML = esc(D.meta.classification).replace(/^((?:\w+ )?Confidential)/, "<b>$1</b>") + ` · ${esc(ST.presenter)}`;
   const c = D.meta.contact || {}, team = c.team || "";
@@ -1646,6 +1650,287 @@ cover(); summary(); team(); growth(); people(); cost(); freeInit(); longterm(); 
   }), {threshold: .12});
   blocks.forEach(b => io.observe(b));
 })();
+</script>
+</body>
+</html>
+<!-- @@SUMMARY -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summary</title>
+<style>
+:root{
+  color-scheme:light;
+  --orange:#D04A02; --tangerine:#EB8C00; --yellow:#FFB600; --rose:#DB536A; --burgundy:#A32020; --charcoal:#2D2D2D;
+  --bg:#F3F3F3; --surface:#FFFFFF; --soft:#F6F4F2; --peach:#FDEDE4; --border:#DEDEDE; --grid:#EBEBEB;
+  --c-canada:#464646; --text:#2D2D2D; --text-2:#5F5F5F; --text-3:#7D7D7D; --good:#2E7D32; --neutral:#BDBDBD;
+  --head:Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14.5px/1.5 Arial,Helvetica,sans-serif}
+.brandbar{background:#fff;border-top:6px solid var(--orange);border-bottom:1px solid var(--border)}
+.brandbar .in{max-width:1240px;margin:0 auto;padding:12px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{height:36px;width:auto}
+.wordmark{font:700 26px var(--head);color:var(--charcoal)}
+.brandbar .cls{margin-left:auto;font-size:12px;color:var(--text-3)}
+.navlink{text-decoration:none;font-weight:700;font-size:13px;color:var(--orange);border:1.5px solid var(--orange);border-radius:4px;padding:6px 12px;white-space:nowrap}
+.navlink:hover{background:var(--orange);color:#fff}
+main{max-width:1240px;margin:0 auto;padding:22px 28px 10px}
+h1{font:700 30px/1.15 var(--head);margin:0 0 4px}
+.sub{color:var(--text-2);font-size:13.5px}
+.block{margin-top:22px}
+.bh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--orange);color:#fff;font:700 13px Arial}
+h2{font:700 20px/1.2 var(--head);margin:0}
+.bh .note{color:var(--text-3);font-size:12.5px}
+.card{background:#fff;border:1px solid var(--border);border-radius:4px;padding:16px 18px;min-width:0}
+.grid{display:grid;gap:14px}
+.who{grid-template-columns:1.3fr 1fr}
+.quote{font:italic 16px/1.45 var(--head);color:var(--text);border-left:4px solid var(--orange);padding:2px 0 2px 14px;margin:0 0 12px}
+.leaders{display:flex;flex-wrap:wrap;gap:10px 22px;margin:4px 0 10px}
+.leader .nm{font-weight:700;color:var(--orange)} .leader .rl{font-size:12.5px;color:var(--text-2)}
+.members{font:700 15px var(--head);color:var(--orange)}
+.lab{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);font-weight:700;margin:2px 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{border:1px solid var(--border);border-radius:3px;padding:3px 9px;font-size:12.5px;background:var(--soft)}
+.contacts{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;margin-bottom:12px}
+.contacts b{color:var(--text)}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.points{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.points li{background:#fff;border:1px solid var(--border);border-top:4px solid var(--orange);border-radius:0 0 4px 4px;padding:14px 16px}
+.points .v{font:700 26px/1.1 var(--head)}
+.points .v.o{color:var(--orange)}
+.points .t{font-size:13px;color:var(--text-2);margin-top:6px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#fff}
+.seg button{background:#fff;border:0;padding:6px 14px;font:inherit;font-size:13px;color:var(--text-2);cursor:pointer}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button.on{background:var(--orange);color:#fff;font-weight:700}
+.chart{position:relative;height:280px}
+.tl{grid-template-columns:3fr 1fr}
+.side .k{font-size:12px;color:var(--text-3)} .side .v{font:700 22px var(--head);margin-bottom:10px}
+select{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:#fff}
+.val{grid-template-columns:repeat(4,1fr)}
+.tile .k{font-size:12.5px;color:var(--text-2)} .tile .v{font:700 26px/1.15 var(--head);margin-top:2px} .tile .d{font-size:12.5px;color:var(--text-3);margin-top:2px}
+.tile.o{border-top:4px solid var(--orange)} .tile.o .v{color:var(--orange)}
+.tile.g{border-top:4px solid var(--charcoal)}
+.bars{display:grid;gap:12px;margin-top:4px}
+.bl{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.bl b{font:700 15px var(--head)}
+.track{height:30px;background:var(--soft);border-radius:3px;overflow:hidden}
+.fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+.credit{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;background:var(--peach);border:1px solid #F3C9B1;border-radius:4px;padding:16px 20px;margin-top:14px}
+.credit .big{font:700 34px/1 var(--head);color:var(--orange);white-space:nowrap}
+.credit .big small{display:block;font:12px Arial;color:var(--text-2);margin-top:4px}
+.credit p{margin:0;font-size:14px}
+.basis{font-size:12px;color:var(--text-3);margin-top:10px}
+footer{max-width:1240px;margin:0 auto;padding:14px 28px 26px;color:var(--text-3);font-size:12px}
+.legal{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px}
+.legal b{color:var(--text)}
+.contactline{margin-top:6px}
+.contactline a{color:inherit}
+/* motion: blocks fade up on load */
+.rv{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
+.rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none} .fill{transition:none}}
+@media (max-width:980px){.who,.tl,.val,.points{grid-template-columns:1fr 1fr} .contacts{grid-template-columns:1fr}}
+@media (max-width:640px){.who,.tl,.val,.points{grid-template-columns:1fr} main,.brandbar .in,footer{padding-left:16px;padding-right:16px}}
+@media print{body{background:#fff} .navlink,.seg,select{display:none} .rv{opacity:1 !important;transform:none !important} .block{break-inside:avoid}}
+</style>
+/*__CHARTJS__*/
+</head>
+<body>
+<div class="brandbar"><div class="in"><!--__LOGO__--><span class="cls" id="clsTop"></span><a class="navlink" id="lnkStory" href="#">Partner story</a><a class="navlink" id="lnkDash" href="#">Full dashboard &#8594;</a></div></div>
+<main>
+  <h1 id="title"></h1>
+  <div class="sub" id="subtitle"></div>
+
+  <section class="block rv">
+    <div class="bh"><span class="num">1</span><h2>Who we are</h2></div>
+    <div class="grid who">
+      <div class="card">
+        <p class="quote" id="wSummary"></p>
+        <div class="leaders" id="wLeaders"></div>
+        <div class="members" id="wMembers"></div>
+      </div>
+      <div class="card">
+        <div class="lab">Territory contacts</div><div class="contacts" id="wContacts"></div>
+        <div class="lab">What we do</div><div class="chips" id="wServices"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block rv">
+    <div class="bh"><span class="num">2</span><h2>Key points</h2><span class="note" id="kpNote"></span></div>
+    <ul class="points" id="kp"></ul>
+  </section>
+
+  <section class="block rv">
+    <div class="bh"><span class="num">3</span><h2>US vs Non-US hours</h2>
+      <div class="seg" id="tlMode"><button data-v="FY" class="on">Financial year</button><button data-v="CY">Calendar year</button><button data-v="M">Month</button></div></div>
+    <div class="grid tl">
+      <div class="card"><div class="chart"><canvas id="cTl"></canvas></div></div>
+      <div class="card side" id="tlSide"></div>
+    </div>
+  </section>
+
+  <section class="block rv">
+    <div class="bh"><span class="num">4</span><h2>Hours booked and their value</h2><select id="valPeriod" aria-label="Period"></select></div>
+    <div class="grid val" id="valTiles"></div>
+    <div class="card" style="margin-top:14px">
+      <div class="bars" id="valBars"></div>
+      <div class="credit" id="valCredit"></div>
+      <div class="basis" id="valBasis"></div>
+    </div>
+  </section>
+</main>
+<footer><div class="legal"><span id="legalLeft"></span><span id="gen"></span></div><div class="contactline" id="signText"></div></footer>
+
+<script>
+const D = /*__DATA__*/null;
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const M = D.months, T = D.territories, R = D.rows, S = D.staff, NM = M.length, LAST = NM - 1, US = T.indexOf("USA");
+const [ri_m, ri_t, ri_s, ri_p, ri_team, ri_h] = [0, 1, 2, 3, 4, 5];
+const el = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const esc = v => String(v ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const ym = i => M[i].split("-").map(Number);
+const mLabel = i => { if (i == null || i < 0 || i >= NM) return "–"; const [y, m] = ym(i); return MON[m - 1] + "-" + String(y).slice(2); };
+const fy = i => { const [y, m] = ym(i); return D.meta.fyStart === 1 ? y : (m >= D.meta.fyStart ? y + 1 : y); };
+const cy = i => ym(i)[0];
+const fH = v => Math.round(v).toLocaleString("en-US");
+const fUSD = v => "$" + Math.round(v).toLocaleString("en-US");
+const fK = v => Math.abs(v) >= 1e6 ? "$" + (v / 1e6).toFixed(2) + "M" : Math.abs(v) >= 1e3 ? "$" + (v / 1e3).toFixed(1) + "K" : fUSD(v);
+const pct = v => v == null || !isFinite(v) ? "–" : Math.round(v * 100) + "%";
+const inWin = (i, n, end = LAST) => i > end - n && i <= end;
+const TVAR = {canada: "--c-canada", usa: "--orange", australia: "--yellow", uk: "--rose", japan: "--burgundy"};
+const tColor = n => css(TVAR[String(n).toLowerCase()] || "--text-3") || "#464646";
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const rateOf = (s, year) => { const rs = S[s].rates, ys = Object.keys(rs).map(Number).sort((a, b) => a - b); if (!ys.length) return null;
+  if (rs[year] != null) return rs[year]; return year < ys[0] ? rs[ys[0]] : rs[ys.filter(y => y <= year).pop()]; };
+const modelRate = s => (D.model[S[s].level] || {}).rate;
+
+// ---------- header, footer
+el("title").textContent = D.meta.summaryTitle || D.meta.title;
+document.title = el("title").textContent;
+el("subtitle").textContent = `Data ${mLabel(0)} to ${mLabel(LAST)} · ${D.meta.source}`;
+el("clsTop").textContent = D.meta.classification;
+el("legalLeft").innerHTML = esc(D.meta.classification).replace(/^((?:\w+ )?Confidential)/, "<b>$1</b>");
+el("gen").textContent = `Generated ${D.meta.generated}`;
+el("lnkDash").href = D.meta.dashboard; el("lnkStory").href = D.meta.storyLink;
+(() => { const c = D.meta.contact || {}, ppl = (c.people || []).map(p => !p.email ? esc(p.name) : p.name ? `${esc(p.name)} (<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>)` : `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`);
+  el("signText").innerHTML = ppl.length ? `For any changes, additions or further analysis, please reach out to ${ppl.join(" or ")}${c.team ? ", " + esc(c.team) : ""}.` : ""; })();
+
+// ---------- 1. who we are
+(() => {
+  const t = (D.content || {}).team || {};
+  el("wSummary").textContent = t.summary || "";
+  el("wLeaders").innerHTML = (t.leaders || []).map(l => `<div class="leader"><div class="nm">${esc(l.name)}</div><div class="rl">${esc(l.role)}${l.note ? " · " + esc(l.note) : ""}</div></div>`).join("");
+  el("wMembers").textContent = [t.teamName, t.members].filter(Boolean).join(" · ");
+  el("wContacts").innerHTML = (t.keyContacts || []).map(k => `<div><span class="sw" style="background:${tColor(k.territory)}"></span><b>${esc(k.territory)}</b> ${esc(k.name)}${k.role ? `, ${esc(k.role)}` : ""}</div>`).join("") || "<div>–</div>";
+  el("wServices").innerHTML = (t.currentServices || []).slice(0, 10).map(x => `<span>${esc(x)}</span>`).join("");
+})();
+
+// ---------- data helpers
+function agg(pred) {   // hours and value for rows matching pred
+  const o = {h: 0, us: 0, non: 0, cur: 0, model: 0, curNon: 0, modelNon: 0, priced: 0, people: new Set()};
+  for (const r of R) {
+    if (!pred(r)) continue;
+    const h = r[ri_h], isUS = r[ri_t] === US, sp = rateOf(r[ri_s], cy(r[ri_m])), mr = modelRate(r[ri_s]);
+    o.h += h; if (isUS) o.us += h; else o.non += h; o.people.add(r[ri_s]);
+    if (sp != null && mr != null) {   // value only where both prices are known
+      o.priced += h; o.cur += h * sp; o.model += h * mr;
+      if (!isUS) { o.curNon += h * sp; o.modelNon += h * mr; }
+    }
+  }
+  return o;
+}
+const periodsOf = mode => {
+  const f = mode === "FY" ? fy : cy, ys = [...new Set(M.map((_, i) => f(i)))];
+  return ys.map(y => { const idx = M.map((_, i) => i).filter(i => f(i) === y);
+    return {label: (mode === "FY" ? "FY" : "CY") + String(y).slice(2) + (idx.length < 12 && idx[idx.length - 1] === LAST ? " YTD" : ""), idx}; });
+};
+
+// ---------- 2. key points (last 12 months)
+(() => {
+  const ltm = agg(r => inWin(r[ri_m], 12)), prev = agg(r => inWin(r[ri_m], 12, LAST - 12));
+  const g = prev.us > 0 ? ltm.us / prev.us - 1 : null, diff = ltm.cur - ltm.model;
+  const terr = new Set(R.filter(r => inWin(r[ri_m], 12)).map(r => r[ri_t])).size;
+  el("kpNote").textContent = `Last 12 months, ${mLabel(Math.max(0, LAST - 11))} to ${mLabel(LAST)}`;
+  el("kp").innerHTML = [
+    [fH(ltm.h), `hours booked by ${ltm.people.size} people across ${terr} territories`, ""],
+    [pct(ltm.us / ltm.h), `of hours were US work${g != null ? `, US hours ${g >= 0 ? "up" : "down"} ${pct(Math.abs(g))} on the year before` : ""}`, ""],
+    [fK(diff), `less at Global Model rates than at today's prices (${pct(ltm.cur ? diff / ltm.cur : null)} lower)`, "o"],
+    [fH(ltm.non), `non-US hours: credit worth about ${fK(ltm.curNon)} at today's prices`, "o"],
+  ].map(([v, t, c]) => `<li><div class="v ${c}">${v}</div><div class="t">${t}</div></li>`).join("");
+})();
+
+// ---------- 3. US vs Non-US timeline
+Chart.defaults.font.family = "Arial, Helvetica, sans-serif"; Chart.defaults.color = css("--text-2");
+Chart.defaults.animation.duration = REDUCED ? 0 : 700;
+let tlChart = null;
+function renderTimeline(mode) {
+  el("tlMode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === mode));
+  let labels, groups;
+  if (mode === "M") { const idx = M.map((_, i) => i).slice(Math.max(0, NM - 24)); labels = idx.map(mLabel); groups = idx.map(i => [i]); }
+  else { const ps = periodsOf(mode); labels = ps.map(p => p.label); groups = ps.map(p => p.idx); }
+  const us = groups.map(g => R.reduce((s, r) => s + (g.includes(r[ri_m]) && r[ri_t] === US ? r[ri_h] : 0), 0));
+  const all = groups.map(g => R.reduce((s, r) => s + (g.includes(r[ri_m]) ? r[ri_h] : 0), 0));
+  const non = all.map((a, k) => a - us[k]);
+  if (tlChart) tlChart.destroy();
+  tlChart = new Chart(el("cTl"), {type: "bar", data: {labels, datasets: [
+      {label: "US", data: us, backgroundColor: css("--orange"), borderRadius: 3, maxBarThickness: mode === "M" ? 22 : 54},
+      {label: "Non-US", data: non, backgroundColor: css("--neutral"), borderRadius: 3, maxBarThickness: mode === "M" ? 22 : 54}]},
+    options: {maintainAspectRatio: false, interaction: {mode: "index", intersect: false},
+      plugins: {legend: {position: "top", align: "start", labels: {boxWidth: 10, boxHeight: 10}},
+                tooltip: {callbacks: {label: c => ` ${c.dataset.label}: ${fH(c.raw)} hrs`, footer: it => { const a = it.reduce((s, x) => s + x.raw, 0); return `Total ${fH(a)} hrs · US ${pct(a ? it[0].raw / a : null)}`; }}}},
+      scales: {x: {stacked: mode === "M", grid: {display: false}, ticks: {maxRotation: 0, autoSkipPadding: 12}},
+               y: {stacked: mode === "M", beginAtZero: true, grid: {color: css("--grid")}, border: {display: false}, ticks: {callback: v => v.toLocaleString("en-US")}}}}});
+  const k = labels.length - 1, cur = all[k], share = cur ? us[k] / cur : null;
+  const unit = mode === "M" ? "month" : "period";
+  // compare like with like: a partial year against the same months a year earlier; a month against the same month last year
+  const usIn = idx => R.reduce((s, r) => s + (idx.includes(r[ri_m]) && r[ri_t] === US ? r[ri_h] : 0), 0);
+  const prevIdx = groups[k].map(i => i - 12).filter(i => i >= 0), prevUS = prevIdx.length === groups[k].length ? usIn(prevIdx) : 0;
+  const prevLabel = mode === "M" ? mLabel(groups[k][0] - 12) : (groups[k].length < 12 ? "same months last year" : esc(labels[k - 1] || ""));
+  el("tlSide").innerHTML = `<div class="k">Latest ${unit}: ${esc(labels[k])}</div>
+    <div class="k" style="margin-top:6px">US hours</div><div class="v" style="color:var(--orange)">${fH(us[k])}</div>
+    <div class="k">Non-US hours</div><div class="v">${fH(non[k])}</div>
+    <div class="k">US share</div><div class="v">${pct(share)}</div>
+    ${prevUS > 0 ? `<div class="k">US hours vs ${prevLabel}</div><div class="v">${us[k] >= prevUS ? "+" : "−"}${pct(Math.abs(us[k] / prevUS - 1))}</div>` : ""}`;
+}
+el("tlMode").addEventListener("click", e => { const b = e.target.closest("button"); if (b) renderTimeline(b.dataset.v); });
+
+// ---------- 4. hours booked and their value
+const PERIODS = [{label: "Last 12 months", pred: r => inWin(r[ri_m], 12)}];
+periodsOf("FY").reverse().forEach(p => PERIODS.push({label: p.label, pred: r => p.idx.includes(r[ri_m])}));
+periodsOf("CY").reverse().forEach(p => PERIODS.push({label: p.label, pred: r => p.idx.includes(r[ri_m])}));
+PERIODS.push({label: "All data", pred: () => true});
+el("valPeriod").innerHTML = PERIODS.map((p, k) => `<option value="${k}">${esc(p.label)}</option>`).join("");
+function renderValue() {
+  const P = PERIODS[+el("valPeriod").value], o = agg(P.pred), diff = o.cur - o.model;
+  const tile = (k, v, d, c = "") => `<div class="card tile ${c}"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  el("valTiles").innerHTML =
+    tile("Hours booked", fH(o.h), `US ${fH(o.us)} · Non-US ${fH(o.non)}`, "g") +
+    tile("Value at today's prices", fUSD(o.cur), "hours × each person's sales price") +
+    tile("Value at Global Model rates", fUSD(o.model), "hours × rate for each person's level") +
+    tile("Pays less by", fUSD(diff), `${pct(o.cur ? diff / o.cur : null)} lower than today`, "o");
+  const max = Math.max(o.cur, o.model, 1);
+  el("valBars").innerHTML = [["Today's prices", o.cur, css("--charcoal")], ["Global Model rates", o.model, css("--orange")]]
+    .map(([n, v, c]) => `<div><div class="bl"><span>${n}</span><b>${fUSD(v)}</b></div><div class="track"><div class="fill" style="width:0;background:${c}" data-w="${(v / max * 100).toFixed(1)}%"></div></div></div>`).join("");
+  requestAnimationFrame(() => requestAnimationFrame(() => el("valBars").querySelectorAll(".fill").forEach(f => f.style.width = f.dataset.w)));
+  el("valCredit").innerHTML = `<div class="big">${fH(o.non)} hrs<small>non-US credit · ${pct(o.h ? o.non / o.h : null)} of hours</small></div>
+    <p>Of the <b>${fH(o.h)}</b> hours booked ${P.label === "Last 12 months" ? "in the last 12 months" : P.label === "All data" ? "across all the data" : "in " + esc(P.label)}, <b>${fH(o.non)}</b> were for non-US territories, worth about <b>${fUSD(o.curNon)}</b> at today's prices.
+    This is the potential (credit) these people carry beyond US work: hours the US can draw on while other territories continue to pay for their share.</p>`;
+  const missing = o.h - o.priced;
+  el("valBasis").textContent = `Today's prices = Sales Price in Staff Master for the year of the hours. Global Model rates = Rate/hr by level (rate card tab). ` +
+    (missing > 0.5 ? `${fH(missing)} hours have no price or level and are left out of the values. ` : "") + (D.meta.taggingNote || "");
+}
+el("valPeriod").addEventListener("change", renderValue);
+
+renderTimeline("FY"); renderValue();
+// fade the blocks in, one after another
+document.querySelectorAll(".rv").forEach((b, k) => setTimeout(() => b.classList.add("in"), REDUCED ? 0 : 80 + k * 120));
 </script>
 </body>
 </html>
