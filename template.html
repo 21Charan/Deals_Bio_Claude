@@ -1740,6 +1740,24 @@ input[type=range]{width:100%;accent-color:var(--orange)}
 .ptable tr.sel td{background:var(--peach);font-weight:700}
 .ptable tr.tot td{font-weight:700;border-top:2px solid var(--charcoal);cursor:pointer;background:#fff;position:sticky;bottom:0}
 .tw{overflow-x:auto;max-height:420px;overflow-y:auto}
+.tablock{margin-top:14px}
+.tablock h3{display:flex;justify-content:center;align-items:center;margin:0;background:var(--yellow);color:var(--charcoal);font:700 15px Arial;padding:6px;border:1px solid #E0A800;border-bottom:0}
+.tkpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}
+.tkpis div{background:var(--soft);border-radius:4px;padding:8px 12px}
+.tkpis .k{font-size:11.5px;color:var(--text-3)} .tkpis .v{font:700 19px var(--head)}
+.tkpis .v.good{color:var(--good)} .tkpis .v.bad{color:#C0392B}
+.tablock .tw{max-height:none;overflow-y:visible}
+.atable{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.atable th{background:var(--orange);color:#fff;font-size:11.5px;font-weight:700;text-align:left;vertical-align:bottom;padding:7px 6px;white-space:normal;min-width:62px}
+.atable th small{display:block;font-weight:400;opacity:.9}
+.atable td{padding:6px 6px;border-bottom:1px solid var(--border);white-space:nowrap}
+.atable td.n,.atable th.n{text-align:right}
+.atable td.neg{color:var(--good)}
+.atable tr.off td{color:var(--text-3);background:#FAFAFA}
+.atable tr.off td.neg{color:var(--text-3)}
+.atable tr.tot td{font-weight:700;border-top:2px solid var(--charcoal);background:#fff}
+.atable input{accent-color:var(--orange);width:15px;height:15px;vertical-align:-2px}
+.tanote{font-style:italic;font-size:12.5px;color:var(--text-2);margin:12px 0 0}
 .hbar{display:inline-block;height:8px;border-radius:2px;background:var(--orange);vertical-align:middle;margin-right:6px}
 footer{max-width:1240px;margin:0 auto;padding:14px 28px 26px;color:var(--text-3);font-size:12px}
 .legal{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px}
@@ -1750,7 +1768,7 @@ footer{max-width:1240px;margin:0 auto;padding:14px 28px 26px;color:var(--text-3)
 .rv{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
 .rv.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none} .fill{transition:none}}
-@media (max-width:980px){.who,.tl,.val,.points,.scn{grid-template-columns:1fr 1fr} .contacts{grid-template-columns:1fr}}
+@media (max-width:980px){.who,.tl,.val,.points,.scn,.tkpis{grid-template-columns:1fr 1fr} .contacts{grid-template-columns:1fr}}
 @media (max-width:640px){.who,.tl,.val,.points,.scn{grid-template-columns:1fr} main,.brandbar .in,footer{padding-left:16px;padding-right:16px}}
 @media print{body{background:#fff} .navlink,.seg,select{display:none} .rv{opacity:1 !important;transform:none !important} .block{break-inside:avoid}}
 </style>
@@ -1801,18 +1819,15 @@ footer{max-width:1240px;margin:0 auto;padding:14px 28px 26px;color:var(--text-3)
     </div>
   </section>
   <section class="block rv">
-    <div class="bh"><span class="num">5</span><h2>Scenario: using the credit hours</h2><span class="note">Pick the hours, the people and how much of them is used</span></div>
+    <div class="bh"><span class="num">5</span><h2>If tagged: cost, credit back and net cost</h2><span class="note">Untick a person to leave them out of the totals</span></div>
     <div class="card">
       <div class="ctls">
-        <div><label>Hours basis</label><div class="seg" id="scBasis"><button data-v="credit" class="on">Credit hours (non-US)</button><button data-v="all">All hours</button></div></div>
-        <div><label for="scPerson">Person</label><select id="scPerson"></select></div>
-        <div class="sh"><label for="scShare">Share of these hours used <span id="scShareV"></span></label><input type="range" id="scShare" min="0" max="100" step="5" value="100"></div>
-        <div><label for="scPeriod">Period</label><select id="scPeriod"></select></div>
+        <div><label for="taPeriod">Period</label><select id="taPeriod"></select></div>
+        <div><label>Tag</label><div class="seg" id="taAll"><button data-v="all">Everyone</button><button data-v="none">No one</button></div></div>
       </div>
-      <div class="grid scn" id="scTiles"></div>
-      <div class="bars" id="scBars" style="margin-top:14px"></div>
-      <div class="tw"><table class="ptable" id="scTable"></table></div>
-      <div class="basis" id="scBasisNote"></div>
+      <div id="taTables"></div>
+      <p class="tanote">Note: a negative net cost / effective rate means the credits from non-US work exceed the cost of tagging - the US gains and its US work is effectively free.</p>
+      <div class="basis" id="taBasis"></div>
     </div>
   </section>
 </main>
@@ -1959,59 +1974,75 @@ function renderValue() {
 }
 el("valPeriod").addEventListener("change", renderValue);
 
-// ---------- 5. scenario: credit (non-US) or all hours, one person or everyone, share used
-const SC = {basis: "credit", person: "all", share: 1};
-el("scPeriod").innerHTML = el("valPeriod").innerHTML;
-function perPerson(pred) {
-  const P = S.map((s, i) => ({i, name: s.name, level: s.level, h: 0, cur: 0, model: 0, priced: 0}));
-  for (const r of R) {
-    if (!pred(r) || (SC.basis === "credit" && r[ri_t] === US)) continue;
-    const p = P[r[ri_s]], h = r[ri_h], sp = rateOf(r[ri_s], cy(r[ri_m])), mr = modelRate(r[ri_s]);
-    p.h += h;
-    if (sp != null && mr != null) { p.priced += h; p.cur += h * sp; p.model += h * mr; }
-  }
-  return P.filter(p => p.h > 0).sort((a, b) => b.h - a.h);
-}
-function renderScenario() {
-  el("scBasis").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === SC.basis));
-  el("scShareV").textContent = Math.round(SC.share * 100) + "%";
-  const P = perPerson(PERIODS[+el("scPeriod").value].pred), k = SC.share;
-  // person list follows the hours basis and period; keep the selection when possible
-  const opts = `<option value="all">All people (${P.length})</option>` + P.map(p => `<option value="${p.i}">${esc(p.name)} (${esc(p.level || "–")})</option>`).join("");
-  el("scPerson").innerHTML = opts;
-  if (SC.person !== "all" && !P.some(p => String(p.i) === SC.person)) SC.person = "all";
-  el("scPerson").value = SC.person;
-  const sel = SC.person === "all" ? P : P.filter(p => String(p.i) === SC.person);
-  const sum = f => sel.reduce((s, p) => s + f(p), 0);
-  const h = sum(p => p.h) * k, cur = sum(p => p.cur) * k, mod = sum(p => p.model) * k, diff = cur - mod;
-  const what = SC.basis === "credit" ? "credit (non-US) hours" : "hours", who = SC.person === "all" ? "all people" : esc(sel[0] ? sel[0].name : "");
-  const tile = (kk, v, d, c = "") => `<div class="card tile ${c}"><div class="k">${kk}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
-  el("scTiles").innerHTML =
-    tile("Hours in scenario", fH(h), `${Math.round(k * 100)}% of ${what}, ${who}`, "g") +
-    tile("At today's prices", fUSD(cur), "hours × sales price") +
-    tile("At Global Model rates", fUSD(mod), "hours × rate for the level") +
-    tile("Lower by", fUSD(diff), `${pct(cur ? diff / cur : null)} lower than today`, "o");
-  const max = Math.max(cur, mod, 1);
-  el("scBars").innerHTML = [["Today's prices", cur, css("--charcoal")], ["Global Model rates", mod, css("--orange")]]
-    .map(([n, v, c]) => `<div><div class="bl"><span>${n}</span><b>${fUSD(v)}</b></div><div class="track"><div class="fill" style="width:${(v / max * 100).toFixed(1)}%;background:${c}"></div></div></div>`).join("");
-  const hmax = Math.max(...P.map(p => p.h), 1);
-  const row = p => `<tr data-i="${p.i}" class="${String(p.i) === SC.person ? "sel" : ""}"><td>${esc(p.name)}</td><td>${esc(p.level || "–")}</td>
-    <td class="n"><span class="hbar" style="width:${Math.max(2, p.h / hmax * 70)}px"></span>${fH(p.h * k)}</td><td class="n">${p.priced ? fUSD(p.cur * k) : "–"}</td>
-    <td class="n">${p.priced ? fUSD(p.model * k) : "–"}</td><td class="n">${p.priced ? fUSD((p.cur - p.model) * k) : "–"}</td></tr>`;
-  const all = {h: P.reduce((s, p) => s + p.h, 0), cur: P.reduce((s, p) => s + p.cur, 0), model: P.reduce((s, p) => s + p.model, 0)};
-  el("scTable").innerHTML = `<thead><tr><th>Person</th><th>Level</th><th class="n">${SC.basis === "credit" ? "Credit hours" : "Hours"}</th><th class="n">Today's prices</th><th class="n">Global Model rates</th><th class="n">Lower by</th></tr></thead><tbody>` +
-    P.map(row).join("") + `<tr class="tot" data-i="all"><td>All people</td><td></td><td class="n">${fH(all.h * k)}</td><td class="n">${fUSD(all.cur * k)}</td><td class="n">${fUSD(all.model * k)}</td><td class="n">${fUSD((all.cur - all.model) * k)}</td></tr></tbody>`;
-  const unpriced = sel.reduce((s, p) => s + p.h - p.priced, 0) * k;
-  el("scBasisNote").textContent = `Credit hours = hours booked to non-US territories; share = the part of them assumed in the scenario. Click a row to focus on one person; click "All people" to go back.` +
-    (unpriced > 0.5 ? ` ${fH(unpriced)} hours have no price or level and are left out of the values.` : "");
-}
-el("scBasis").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { SC.basis = b.dataset.v; renderScenario(); } });
-el("scPerson").addEventListener("change", e => { SC.person = e.target.value; renderScenario(); });
-el("scShare").addEventListener("input", e => { SC.share = +e.target.value / 100; renderScenario(); });
-el("scPeriod").addEventListener("change", renderScenario);
-el("scTable").addEventListener("click", e => { const tr = e.target.closest("tr[data-i]"); if (!tr) return; SC.person = tr.dataset.i === SC.person ? "all" : tr.dataset.i; renderScenario(); });
+// ---------- 5. tagging analysis: cost if tagged, credit back for non-US hours, net cost to the US
+//  (1) cost to US if tagged = total hours x US tagged rate (rate card Rate/hr for the level)
+//  (2) credit back to US    = non-US hours x non-tagged rate (sales price for the year of the hours)
+//  (3) net cost to US       = (1) - (2)
+const TA = {off: new Set(), period: null};
+const fMoney = v => v == null ? "–" : (v < 0 ? "(" : "") + "$" + Math.abs(Math.round(v)).toLocaleString("en-US") + (v < 0 ? ")" : "");
+const fRate = v => v == null || !isFinite(v) ? "–" : (v < 0 ? "(" : "") + "$" + Math.abs(v).toFixed(2) + (v < 0 ? ")" : "");
+const fHr = v => v ? v.toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1}) : "–";
+const ymLabel = idx => { const a = ym(idx[0]), b = ym(idx[idx.length - 1]); return `${MON[a[1] - 1]}-${MON[b[1] - 1]}`; };
+// period list: the latest two calendar years shown together (as in the client's view), then single periods
+const cys = periodsOf("CY"), fys = periodsOf("FY");
+const cyLabel = p => { const full = p.idx.length === 12; const y = cy(p.idx[0]); return full ? String(y) : `${y} YTD (${ymLabel(p.idx)})`; };
+const fyLabel = p => p.idx.length === 12 ? p.label : `${p.label.replace(" YTD", "")} YTD (${ymLabel(p.idx)})`;
+const TA_PERIODS = [];
+if (cys.length >= 2) TA_PERIODS.push({label: `${cyLabel(cys[cys.length - 2])} and ${cyLabel(cys[cys.length - 1])}`, parts: cys.slice(-2).map(p => ({title: cyLabel(p), idx: p.idx}))});
+cys.slice().reverse().forEach(p => TA_PERIODS.push({label: cyLabel(p), parts: [{title: cyLabel(p), idx: p.idx}]}));
+fys.slice().reverse().forEach(p => TA_PERIODS.push({label: fyLabel(p), parts: [{title: fyLabel(p), idx: p.idx}]}));
+TA_PERIODS.push({label: "Last 12 months", parts: [{title: `Last 12 months (${mLabel(Math.max(0, LAST - 11))} to ${mLabel(LAST)})`, idx: M.map((_, i) => i).filter(i => inWin(i, 12))}]});
+el("taPeriod").innerHTML = TA_PERIODS.map((p, k) => `<option value="${k}">${esc(p.label)}</option>`).join("");
 
-renderTimeline("FY"); renderValue(); renderScenario();
+function taRows(idx) {
+  const inP = new Set(idx), P = S.map((s, i) => ({i, name: s.name, level: s.level, us: 0, non: 0, credit: 0, priced: true}));
+  for (const r of R) {
+    if (!inP.has(r[ri_m])) continue;
+    const p = P[r[ri_s]], h = r[ri_h];
+    if (r[ri_t] === US) p.us += h;
+    else { p.non += h; const sp = rateOf(r[ri_s], cy(r[ri_m])); if (sp == null) p.priced = false; else p.credit += h * sp; }
+  }
+  return P.filter(p => p.us + p.non > 0).map(p => {
+    const rate = modelRate(p.i), tot = p.us + p.non, ok = rate != null && p.priced;
+    const c1 = ok ? tot * rate : null, c2 = ok ? p.credit : null, c3 = ok ? c1 - c2 : null, usCost = ok ? p.us * rate : null;
+    return {...p, tot, rate, ok, c1, c2, c3, usCost, eff: ok && p.us ? c3 / p.us : null, benefit: ok ? usCost - c3 : null, cpp: ok && tot ? c3 / tot : null};
+  }).sort((a, b) => b.tot - a.tot);
+}
+function taTable(part) {
+  const rows = taRows(part.idx), on = rows.filter(r => !TA.off.has(r.i) && r.ok);
+  const sum = f => on.reduce((s, r) => s + f(r), 0);
+  const T = {us: sum(r => r.us), non: sum(r => r.non), tot: sum(r => r.tot), c1: sum(r => r.c1), c2: sum(r => r.c2), c3: sum(r => r.c3), usCost: sum(r => r.usCost), benefit: sum(r => r.benefit)};
+  T.eff = T.us ? T.c3 / T.us : null; T.cpp = T.tot ? T.c3 / T.tot : null;
+  const neg = v => v != null && v < 0 ? "neg" : "";
+  const cells = r => `<td class="n">${fHr(r.us)}</td><td class="n">${fHr(r.non)}</td><td class="n">${fHr(r.tot)}</td>
+    <td class="n">${fMoney(r.c1)}</td><td class="n">${fMoney(r.c2)}</td><td class="n ${neg(r.c3)}">${fMoney(r.c3)}</td><td class="n">${fMoney(r.usCost)}</td>
+    <td class="n ${neg(r.eff)}">${fRate(r.eff)}</td><td class="n">${fMoney(r.benefit)}</td><td class="n ${neg(r.cpp)}">${fRate(r.cpp)}</td>`;
+  const kpi = (k, v, cls = "") => `<div><div class="k">${k}</div><div class="v ${cls}">${v}</div></div>`;
+  return `<div class="tablock"><h3>${esc(part.title)}</h3>
+    <div class="tkpis">${kpi("(3) Net cost to US", fMoney(T.c3), T.c3 < 0 ? "good" : "")}${kpi("Benefit to US", fMoney(T.benefit), T.benefit > 0 ? "good" : "bad")}
+      ${kpi("Effective rate per US hour", fRate(T.eff), T.eff != null && T.eff < 0 ? "good" : "")}${kpi("People tagged", `${on.length} of ${rows.length}`)}</div>
+    <div class="tw"><table class="atable"><thead><tr><th>Tag</th><th>Staff name</th><th>Level</th><th class="n">US hours</th><th class="n">Non-US hours</th><th class="n">Total hours</th>
+      <th class="n">(1) Cost to US if tagged<small>= total hrs × US tagged rate</small></th><th class="n">(2) Credit back to US<small>= non-US hrs × non-tagged rate</small></th>
+      <th class="n">(3) Net cost to US<small>= (1) − (2)</small></th><th class="n">Cost of US hours at US tagged rate<small>(no credit)</small></th>
+      <th class="n">Effective rate per US hour<small>= (3) / US hrs</small></th><th class="n">Benefit to US<small>= cost of US hours − (3)</small></th>
+      <th class="n">Effective CPP rate after credits<small>= (3) / total hrs</small></th></tr></thead><tbody>` +
+    rows.map(r => `<tr class="${TA.off.has(r.i) ? "off" : ""}"><td><input type="checkbox" data-i="${r.i}" ${TA.off.has(r.i) ? "" : "checked"} ${r.ok ? "" : "disabled"} aria-label="Tag ${esc(r.name)}"></td>
+      <td>${esc(r.name)}</td><td>${esc(r.level || "–")}</td>${cells(r)}</tr>`).join("") +
+    `<tr class="tot"><td></td><td>${esc((D.content && D.content.team && D.content.team.teamName) || "Team")} total</td><td></td>${cells(T)}</tr></tbody></table></div></div>`;
+}
+function renderTagging() {
+  const P = TA_PERIODS[+el("taPeriod").value || 0];
+  el("taTables").innerHTML = P.parts.map(taTable).join("");
+  const missing = new Set(); P.parts.forEach(part => taRows(part.idx).forEach(r => { if (!r.ok) missing.add(r.name); }));
+  el("taBasis").textContent = "US tagged rate = Rate/hr for the person's level in the rate card tab. Non-tagged rate = Sales Price in Staff Master for the year of the hours. " +
+    (missing.size ? `No rate or price for: ${[...missing].join(", ")} (left out of the totals). ` : "") + (D.meta.taggingNote || "");
+}
+el("taPeriod").addEventListener("change", renderTagging);
+el("taTables").addEventListener("change", e => { const c = e.target.closest("input[type=checkbox]"); if (!c) return; const i = +c.dataset.i; c.checked ? TA.off.delete(i) : TA.off.add(i); renderTagging(); });
+el("taAll").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  TA.off = new Set(b.dataset.v === "none" ? S.map((_, i) => i) : []); renderTagging(); });
+
+renderTimeline("FY"); renderValue(); renderTagging();
 // fade the blocks in, one after another
 document.querySelectorAll(".rv").forEach((b, k) => setTimeout(() => b.classList.add("in"), REDUCED ? 0 : 80 + k * 120));
 </script>
