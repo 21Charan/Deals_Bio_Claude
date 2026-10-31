@@ -1,10 +1,11 @@
 """
 ESG Territory Hours - one-file builder
 =====================================
-Reads one Excel workbook and writes three offline HTML pages:
-  ESG_Summary.html           one-page summary (who we are, key points, US vs Non-US hours, value of hours)
-  ESG_Hours_Dashboard.html   full dashboard (territories, growth, rates, US tagging scenario planner)
-  ESG_US_Story_v2.html       partner story (arrow keys move between sections)
+Reads one Excel workbook and writes ONE offline HTML page (ESG_Hours_Dashboard.html) with tabs:
+  Summary            who we are, key points, cost / credit back / net cost if tagged (period, level and
+                     US-rate controls), US vs Non-US hours over time
+  Tagging analysis   per-person tables: cost if tagged, credit back, net cost, benefit to the US
+  Team, Energy Transition, Overview, US vs Non-US
 
 Run:   py build.py                      (or double-click build.py)
        py build.py --excel "D:\\Data\\Hours.xlsx"
@@ -18,7 +19,7 @@ to the workbook on the first run (a backup copy is kept).
 # with the same names - that file is ignored by Git.
 EXCEL_FILE = "ESG_Hours_Sample.xlsx"   # file name next to build.py, or a full path
 
-CONTACT_NAME = ""                      # sign-off at the end of both pages
+CONTACT_NAME = ""                      # sign-off at the end of the page
 CONTACT_EMAIL = ""
 CONTACT_NAME_2 = ""                    # optional second contact
 CONTACT_EMAIL_2 = ""
@@ -30,10 +31,8 @@ REPORT_TITLE = "ESG Delivery: Territory Hours"      # if the workbook has no 'Re
 CLASSIFICATION = "Confidential | Internal use only" # if the workbook has no 'Classification' assumption
 
 TEMPLATE_FILE = "template.html"
-DASHBOARD_FILE = "ESG_Hours_Dashboard.html"
-STORY_FILE = "ESG_US_Story_v2.html"
-SUMMARY_FILE = "ESG_Summary.html"      # one-page summary
-OPEN_WHEN_DONE = True                  # open the story page at the end
+PAGE_FILE = "ESG_Hours_Dashboard.html"  # the one page that is written
+OPEN_WHEN_DONE = True                  # open the page at the end
 # ==========================================================================
 try:
     from local_settings import *       # noqa: F401,F403
@@ -127,9 +126,9 @@ STORY = {
     "meeting": "Discussion with US Partners",
     "presenter": "Your Team, Your Organisation",
     "ask": [
-        "Approve tagging to the US of the AC people who already spend most of their time on US work",
-        "Agree the Global Model FY27 rate card as the basis for US-tagged hours",
-        "Review the tagging every quarter as US volume grows, and add people as they cross the threshold",
+        "Approve tagging the team shown here to the US",
+        "Adopt the Global Model FY27 rates for US-tagged hours, with other territories' work credited back to the US",
+        "Review results quarterly as US demand grows",
     ],
     "winUS": [
         "Lower cost for the same people and the same quality: Global Model rate instead of sales price",
@@ -637,7 +636,6 @@ def build_payload(raw, staff, model, callouts, assum, wrn_cat, inputs, source_na
         "title": clean_str(assum.get("Report title"), REPORT_TITLE), "classification": clean_str(assum.get("Classification"), CLASSIFICATION),
         "contact": {"people": [{"name": n, "email": e} for n, e in ((CONTACT_NAME, CONTACT_EMAIL), (CONTACT_NAME_2, CONTACT_EMAIL_2)) if n or e],
                     "team": CONTACT_TEAM},
-        "storyLink": STORY_FILE,
     }
     meta["presets"] = [{**pr, "threshold": meta["threshold"] if pr["threshold"] is None else pr["threshold"],
                         "window": meta["window"] if pr["window"] is None else pr["window"]} for pr in (inp["presets"] or SCENARIO_PRESETS)]
@@ -816,13 +814,13 @@ def ensure_input_tabs(path):
 
 # ================================================================== write pages ===
 def load_templates():
-    """template.html holds both pages and the chart library, separated by <!-- @@NAME --> markers."""
+    """template.html holds the page and the chart library, separated by <!-- @@NAME --> markers."""
     path = HERE / TEMPLATE_FILE
     if not path.exists():
         sys.exit(f"{TEMPLATE_FILE} not found next to build.py.")
     parts = re.split(r"<!-- @@([A-Z]+)[^>]*-->\n?", path.read_text(encoding="utf-8"))
     found = {name: body for name, body in zip(parts[1::2], parts[2::2])}
-    for need in ("DASHBOARD", "STORY", "CHARTJS"):
+    for need in ("PAGE", "CHARTJS"):
         if need not in found:
             sys.exit(f"{TEMPLATE_FILE} is missing the <!-- @@{need} --> section.")
     return found
@@ -847,8 +845,8 @@ def write_page(template, chart_tag, payload, out):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--excel", default=EXCEL_FILE, help="Path to the hours workbook")
-    ap.add_argument("--out-dir", default=str(HERE), help="Folder for the two HTML pages")
-    ap.add_argument("--no-open", action="store_true", help="Do not open the story page at the end")
+    ap.add_argument("--out-dir", default=str(HERE), help="Folder for the HTML page")
+    ap.add_argument("--no-open", action="store_true", help="Do not open the page at the end")
     args = ap.parse_args()
     excel = Path(args.excel).expanduser()
     excel = excel if excel.is_absolute() else HERE / excel
@@ -865,8 +863,7 @@ def main():
     if payload["content"] is None:
         payload["content"] = DEFAULT_CONTENT
     payload["story"] = {**STORY, **{k: v for k, v in (payload.get("storyInput") or {}).items() if v}}
-    payload["meta"].update(dashboard=DASHBOARD_FILE, today=datetime.now().strftime("%B %Y"),
-                           summary=SUMMARY_FILE if "SUMMARY" in tpl else None)
+    payload["meta"].update(today=datetime.now().strftime("%B %Y"))
     todo_sheet = payload.pop("todoInput", None)
     todo = apply_setup(payload, read_setup(payload.pop("setupInput", None)))
     if todo_sheet is not None:
@@ -876,18 +873,13 @@ def main():
         print(f"  {k:<45} {v}")
     print(f"  {'Team Sheet: still to fill':<45} {', '.join(todo) if todo else 'nothing - all placeholders replaced'}")
 
-    print("\n[3/3] Writing the pages ...")
+    print("\n[3/3] Writing the page ...")
     chart_tag = "<script>" + tpl["CHARTJS"].strip() + "\n</script>"
-    dash, story = out_dir / DASHBOARD_FILE, out_dir / STORY_FILE
-    write_page(tpl["DASHBOARD"], chart_tag, payload, dash)
-    write_page(tpl["STORY"], chart_tag, payload, story)
-    if "SUMMARY" in tpl:
-        summary = out_dir / SUMMARY_FILE
-        write_page(tpl["SUMMARY"], chart_tag, payload, summary)
-        print(f"  {summary}")
-    print(f"  {dash}\n  {story}\n\nDone.")
+    page = out_dir / PAGE_FILE
+    write_page(tpl["PAGE"], chart_tag, payload, page)
+    print(f"  {page}\n\nDone.")
     if OPEN_WHEN_DONE and not args.no_open:
-        webbrowser.open(story.as_uri())
+        webbrowser.open(page.as_uri())
 
 
 if __name__ == "__main__":
