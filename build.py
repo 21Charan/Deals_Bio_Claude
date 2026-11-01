@@ -537,16 +537,19 @@ def build_payload(raw, staff, model, callouts, assum, wrn_cat, inputs, source_na
                 "costCenter": clean_str(r.get("Home Cost Center")),
                 "tag": tag_txt,
                 "tagTerritory": tag_terr,
+                "inTeam": True,   # listed in Staff Master = part of the team
                 "rates": {str(y): float(r[c]) for y, c in rate_cols.items() if pd.notna(r.get(c))},
             }
 
-    # Fill level / team from the raw data where the master lacks them, and vice versa.
+    # Level comes from the raw data (Management Level, the person's most common value); Staff Master only fills gaps.
+    # Team: Staff Master first, raw data fills gaps.
     unknown_staff = sorted(set(raw["_staff"]) - set(smap))
-    for name in unknown_staff:
-        smap[name] = {"name": name, "level": "", "team": "", "costCenter": "", "tag": "", "tagTerritory": "", "rates": {}}
+    no_master = not smap   # no Staff Master at all: treat everyone in the hours as the team
+    for name in unknown_staff:   # in the hours but not in Staff Master = "Others"
+        smap[name] = {"name": name, "level": "", "team": "", "costCenter": "", "tag": "", "tagTerritory": "", "rates": {}, "inTeam": no_master}
     if "Management Level" in raw.columns:
         for name, lv in raw.dropna(subset=["Management Level"]).groupby("_staff")["Management Level"].agg(lambda s: s.mode().iat[0]).items():
-            if not smap[name]["level"]:
+            if str(lv).strip():
                 smap[name]["level"] = str(lv).strip().upper()
     if "Team Name" in raw.columns:
         raw["_team"] = raw["Team Name"].map(clean_str)
@@ -614,6 +617,11 @@ def build_payload(raw, staff, model, callouts, assum, wrn_cat, inputs, source_na
     model_default = not model_rates
     if model_default:
         model_rates = {lv: {"name": n, "rate": float(r), "cpp": float(c)} for lv, (n, r, c) in DEFAULT_MODEL.items()}
+    # levels written out in full ("Manager") are matched to the rate card codes ("M")
+    by_name = {v["name"].strip().upper(): k for k, v in model_rates.items()}
+    for st in smap.values():
+        if st["level"] and st["level"] not in model_rates and st["level"] in by_name:
+            st["level"] = by_name[st["level"]]
 
     calls = []
     if not callouts.empty:
@@ -653,7 +661,8 @@ def build_payload(raw, staff, model, callouts, assum, wrn_cat, inputs, source_na
         "total hours": round(raw["Hours"].sum(), 1),
         "hours by ESG/ET": ", ".join(f"{c} {h:,.0f}" for c, h in raw.groupby("_cat")["Hours"].sum().items()),
         "months": f"{months[0]} to {months[-1]}", "territories": ", ".join(terrs),
-        "staff not in Staff Master": ", ".join(unknown_staff) or "none",
+        "Others (in the hours, not in Staff Master)": ("none" if not unknown_staff else "no Staff Master - everyone counted as the team" if no_master
+            else f"{len(unknown_staff)} {'person' if len(unknown_staff) == 1 else 'people'}, {raw[raw['_staff'].isin(unknown_staff)]['Hours'].sum():,.1f} hrs: " + ", ".join(unknown_staff)),
         "staff without a level": ", ".join(n for n in staff_names if not smap[n]["level"]) or "none",
         "sales prices": (", ".join(f"{y}: '{c}'" for y, c in sorted(rate_cols.items())) if rate_cols
                          else "MISSING - add 'Sales Price' (or 'Sales Price YYYY') to Staff Master; cost and saving figures need it"),
