@@ -703,6 +703,8 @@ function renderSummary() {
   renderTimeline(); renderRateCard();
 }
 
+// a little space between the legend and the plot
+const legendGap = {id: "legendGap", beforeInit(ch) { const fit = ch.legend.fit; ch.legend.fit = function () { fit.call(this); this.height += 12; }; }};
 // value labels on bars: drawn only where they fit, so they never overlap
 const fitLabels = {id: "fitLabels", afterDatasetsDraw(ch) {
   const {ctx} = ch, stacked = !!ch.options.scales.x.stacked, ds = ch.data.datasets; ctx.save(); ctx.textAlign = "center";
@@ -755,8 +757,8 @@ function renderTimeline() {
       plugins: {legend: {position: "top", align: "start", labels: {boxWidth: 10, boxHeight: 10}},
                 tooltip: {callbacks: {label: c => ` ${c.dataset.label}: ${fH(c.raw)} hrs`, footer: it => { const a = it.reduce((s, x) => s + x.raw, 0); return `Total ${fH(a)} hrs · US ${pct0(a ? it[0].raw / a : null)}`; }}}},
       scales: {x: {stacked: tlMode === "M", grid: {display: false}, ticks: {maxRotation: 0, autoSkipPadding: 12}},
-               y: {stacked: tlMode === "M", beginAtZero: true, grid: {color: css("--grid")}, border: {display: false}, ticks: {callback: v => v.toLocaleString("en-US")}}},
-      layout: {padding: {top: 18}}}, plugins: [fitLabels]});
+               y: {stacked: tlMode === "M", beginAtZero: true, grace: "8%", grid: {color: css("--grid")}, border: {display: false}, ticks: {callback: v => v.toLocaleString("en-US")}}},
+      layout: {padding: {top: 0}}}, plugins: [fitLabels, legendGap]});
   const k = labels.length - 1;
   // compare like with like: a partial year against the same months a year earlier
   const prevIdx = groups[k].map(i => i - 12).filter(i => i >= 0), prevUS = prevIdx.length === groups[k].length ? sumIdx(usM, prevIdx) : 0;
