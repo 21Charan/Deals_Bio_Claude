@@ -268,6 +268,8 @@ select{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--borde
 @media (max-width:900px){.tl,.tkpis{grid-template-columns:1fr 1fr}}
 @media (max-width:640px){.stiles,.tl{grid-template-columns:1fr 1fr} .rate{grid-template-columns:96px minmax(0,1fr) 56px} .kp li{grid-template-columns:80px 1fr}}
 /* ---- v5 changes */
+.grp2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grp2 select{width:100%}
 .brandtitle{font:700 22px/1.2 var(--head);color:var(--charcoal)}
 header nav{margin-top:4px}
 @media (max-width:640px){.brandtitle{font-size:17px} .brandbar .in{flex-wrap:wrap;gap:10px 14px;padding-left:16px;padding-right:16px} .brandbar .cls{margin-left:0;width:100%} .brandbar .div{display:none}}
@@ -314,6 +316,10 @@ header nav{margin-top:4px}
   <div class="panel">
     <div class="grid" style="gap:16px;align-content:start">
     <div class="card ctlbox">
+      <div class="grp grp2">
+        <div><label class="gl" for="sYear">Year</label><select id="sYear"></select></div>
+        <div><label class="gl" for="sPerson">Person</label><select id="sPerson"></select></div>
+      </div>
       <div class="grp"><div class="gl">Staff level</div><div class="seg wrap" id="sLevel"></div></div>
       <div class="grp"><div class="gl"><span>US hourly rate after tagging</span><button class="btn sm" id="sReset">Reset</button></div><div id="sRates"></div></div>
     </div>
@@ -332,7 +338,8 @@ header nav{margin-top:4px}
 
   <div class="sec-h"><h2 id="tlTitle">US hours over time</h2>
     <div class="seg" id="tlMode"><button data-v="FY" class="on">Financial year</button><button data-v="CY">Calendar year</button><button data-v="M">Month</button></div>
-    <div class="seg" id="tlRange" hidden><button data-v="12" class="on">Last 12 months</button><button data-v="0" id="tlSince">Since first US engagement</button></div></div>
+    <div class="seg" id="tlRange" hidden><button data-v="12" class="on">Last 12 months</button><button data-v="0" id="tlSince">Since first US engagement</button></div>
+    <div class="seg" id="tlScope" hidden></div></div>
   <div class="card"><div class="note" id="tlNote" style="font-size:13.5px;color:var(--text)"></div><div class="chart"><canvas id="cTl"></canvas></div></div>
 
   <div class="sec-h"><h2>Rates: current price vs Global Model</h2></div>
@@ -395,7 +402,7 @@ header nav{margin-top:4px}
   <div class="grid g2" style="margin-top:16px;align-items:start">
     <div class="card"><h2>Net cost to the US by person</h2><div class="note" id="pplNote"></div><div class="chart" id="cPeopleBox"><canvas id="cPeople"></canvas></div></div>
     <div class="grid" style="gap:16px">
-      <div class="card"><h2>Hours by territory</h2><div class="note">By financial year</div><div class="tw" id="terrTable" style="max-height:none"></div></div>
+      <div class="card"><div class="ctl" style="justify-content:space-between;margin-bottom:2px"><h2>Hours by territory</h2><div class="seg" id="terrScope" hidden></div></div><div class="note">By financial year</div><div class="tw" id="terrTable" style="max-height:none"></div></div>
     </div>
   </div>
 
@@ -576,7 +583,14 @@ const cys = periods("CY"), fys = periods("FY");
 const cyLabel = p => p.idx.length === 12 ? String(p.y) : `${p.y} YTD (${ymLabel(p.idx)})`;
 const fyLabel = p => p.idx.length === 12 ? p.label : `${p.label.replace(" YTD", "")} YTD (${ymLabel(p.idx)})`;
 const LTM = {title: `Last 12 months (${mLabel(Math.max(0, LAST - 11))} to ${mLabel(LAST)})`, short: "Last 12 months", idx: M.map((_, i) => i).filter(i => inWindow(i, 12))};
+let SY = 0, SPER = "all";   // Overview: selected period (index into SUM_P) and person ("all" or staff index)
+const ALLP = {title: `All hours (${mLabel(0)} to ${mLabel(LAST)})`, short: "All hours", idx: M.map((_, i) => i)};   // the Overview uses every month in the raw data
 
+const inTeam = i => S[i].inTeam !== false;
+const OTHERS = S.map((s, i) => i).filter(i => !inTeam(i));
+let SCOPE = "team";   // hours chart and territory table: "team" or "all" (team + Others)
+const inScope = r => SCOPE === "all" || inTeam(r[ri_s]);
+function scopeBtns() { return `<button data-v="team" class="${SCOPE === "team" ? "on" : ""}">Our team</button><button data-v="all" class="${SCOPE === "all" ? "on" : ""}">Team + Others</button>`; }
 function taRows(idx, lv = LV) {
   const inP = new Set(idx), P = S.map((s, i) => ({i, name: s.name, level: s.level, us: 0, non: 0, credit: 0, today: 0, priced: true}));
   for (const r of ALL) {
@@ -586,7 +600,7 @@ function taRows(idx, lv = LV) {
     if (r[ri_t] === US) { p.us += h; p.today += h * (sp || 0); }
     else { p.non += h; p.credit += h * (sp || 0); }
   }
-  return P.filter(p => p.us + p.non > 0 && (lv === "all" || p.level === lv)).map(p => {
+  return P.filter(p => p.us + p.non > 0 && inTeam(p.i) && (lv === "all" || p.level === lv)).map(p => {
     const rate = RATE[p.level], tot = p.us + p.non, ok = rate != null && p.priced;
     const c1 = ok ? tot * rate : null, c2 = ok ? p.credit : null, c3 = ok ? c1 - c2 : null, usCost = ok ? p.us * rate : null;
     return {...p, tot, rate, ok, c1, c2, c3, usCost, eff: ok && p.us ? c3 / p.us : null, benefit: ok ? usCost - c3 : null, cpp: ok && tot ? c3 / tot : null};
@@ -625,9 +639,17 @@ function initRates() {
       <span class="v"></span><span class="h"></span></div>`; }).join("") || "<div class='note'>No levels with a rate in the rate card tab.</div>";
 }
 
+const SUM_P = [ALLP, ...fys.slice().reverse().map(p => ({title: fyLabel(p), short: fyLabel(p), idx: p.idx}))];
 function renderSummary() {
-  const P = LTM, rows = taRows(P.idx), on = included(rows), X = totals(on);
-  el("sNote").textContent = `Based on the ${P.title.replace(/^Last/, "last")}. Select a staff level or adjust the US rate to test the numbers.`;
+  const P = SUM_P[SY] || ALLP, inLevel = taRows(P.idx);
+  // person list: everyone with hours in this year and level; drop a selection that no longer applies
+  const ppl = inLevel.filter(r => r.ok).slice().sort((a, b) => a.name.localeCompare(b.name));
+  if (SPER !== "all" && !ppl.some(r => r.i === SPER)) SPER = "all";
+  el("sPerson").innerHTML = `<option value="all">Everyone (${ppl.length})</option>` + ppl.map(r => `<option value="${r.i}" ${r.i === SPER ? "selected" : ""}>${esc(r.name)}</option>`).join("");
+  const one = SPER === "all" ? null : ppl.find(r => r.i === SPER);
+  const rows = one ? [one] : inLevel, on = one ? [one] : included(rows), X = totals(on);
+  const subj = one ? esc(one.name) : "the team", poss = one ? "their" : "its";
+  el("sNote").textContent = `Based on the hours in the Project Hours Raw Data (${mLabel(0)} to ${mLabel(LAST)}). Choose a year, a person or a staff level, or adjust the US rate to test the numbers.`;
   const all = taRows(P.idx, "all").filter(r => r.ok);   // rate hints use everyone with hours, ticked or not
   el("sRates").querySelectorAll(".rate").forEach(row => {
     const l = row.dataset.lv, grp = all.filter(r => r.level === l), tot = grp.reduce((s, r) => s + r.tot, 0), cr = grp.reduce((s, r) => s + r.c2, 0);
@@ -637,17 +659,18 @@ function renderSummary() {
     row.querySelector(".h").innerHTML = `Global rate $${D.model[l].rate}` + (tot ? ` · No net cost to the US up to <b>$${Math.floor(cr / tot)}</b>` : " · No hours in this period");
   });
   const who = LV === "all" ? "all levels" : lvPlural(LV);
-  el("sEyebrow").textContent = `${P.short} · ${who} · ${on.length} ${on.length === 1 ? "person" : "people"}`;
+  el("sEyebrow").textContent = one ? `${P.title} · ${lvName(one.level)}` : `${P.title} · ${who} · ${on.length} ${on.length === 1 ? "person" : "people"}`;
   const sv = X.today ? X.saving / X.today : null;
-  el("sHeadline").innerHTML = !on.length ? "No one is selected. Choose another staff level, or include people in Details &amp; Analysis."
-    : X.c3 <= 0 ? `Tagging the team to the US removes the cost of its ${fH(X.us)} US hours: <b>${fK(X.today)}</b> today, <b class="g">nothing</b> after tagging${X.c3 < 0 ? `, with a further <b class="g">${fK(-X.c3)}</b> gain` : ""}.`
-    : X.saving >= 0 ? `Tagging the team to the US reduces the cost of its ${fH(X.us)} US hours from <b>${fK(X.today)}</b> to <b>${fK(X.c3)}</b>, a <b class="g">${pct0(sv)} saving</b>.`
+  el("sHeadline").innerHTML = !on.length ? "No one is selected. Choose another year or staff level, or include people in Details &amp; Analysis."
+    : X.us < 0.05 ? `${one ? subj + " has" : "The selection has"} no US hours in this period. Tagging to the US would ${X.c3 <= 0 ? `bring the US <b class="g">${fK(-X.c3)}</b> more in credit than it costs` : `cost the US a net <b>${fK(X.c3)}</b>`}.`
+    : X.c3 <= 0 ? `Tagging ${subj} to the US removes the cost of ${poss} ${fH(X.us)} US hours: <b>${fK(X.today)}</b> today, <b class="g">nothing</b> after tagging${X.c3 < 0 ? `, with a further <b class="g">${fK(-X.c3)}</b> gain` : ""}.`
+    : X.saving >= 0 ? `Tagging ${subj} to the US reduces the cost of ${poss} ${fH(X.us)} US hours from <b>${fK(X.today)}</b> to <b>${fK(X.c3)}</b>, a <b class="g">${pct0(sv)} saving</b>.`
     : `At these rates, tagging would increase the cost of ${fH(X.us)} US hours from ${fK(X.today)} to <b>${fK(X.c3)}</b>, <b>${fK(-X.saving)} more</b> than today.`;
   const nowRate = X.us ? X.today / X.us : null, newRate = X.us ? X.usCost / X.us : null;   // average US hourly rate today vs after tagging
   el("sPoints").innerHTML = on.length ? [
-    `<b>How it works:</b> the US carries the full cost of the team (${fK(X.c1)}). Other territories continue to pay for their work at current prices, and that ${fK(X.c2)} is credited back to the US.`,
-    nowRate && newRate < nowRate ? `<b>Lower rate, US first:</b> once tagged to the US, the average hourly rate falls from ${fRate(nowRate)} to ${fRate(newRate)}, and US work becomes the team's first priority.`
-      : `<b>US first:</b> once tagged to the US, US work becomes the team's first priority.`,
+    `<b>How it works:</b> the US carries the full cost of ${subj} (${fK(X.c1)}). Other territories continue to pay for their work at current prices, and that ${fK(X.c2)} is credited back to the US.`,
+    nowRate && newRate < nowRate ? `<b>Lower rate, US first:</b> once tagged to the US, the average hourly rate falls from ${fRate(nowRate)} to ${fRate(newRate)}, and US work becomes ${one ? "their" : "the team's"} first priority.`
+      : `<b>US first:</b> once tagged to the US, US work becomes ${one ? "their" : "the team's"} first priority.`,
   ].filter(Boolean).map(t => `<li>${t}</li>`).join("") : "";
   const tile = (k, v, d, c = "") => `<div class="st ${c}"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
   el("sTiles").innerHTML =
@@ -708,12 +731,16 @@ function renderTimeline() {
     const idx = M.map((_, i) => i).slice(tlRange ? Math.max(0, NM - tlRange) : first); labels = idx.map(mLabel); groups = idx.map(i => [i]); }
   else { const ps = periods(tlMode); labels = ps.map(p => p.label); groups = ps.map(p => p.idx); }
   const usM = M.map(() => 0), allM = M.map(() => 0);
-  for (const r of ALL) { allM[r[ri_m]] += r[ri_h]; if (r[ri_t] === US) usM[r[ri_m]] += r[ri_h]; }
+  for (const r of ALL) { if (!inScope(r)) continue; allM[r[ri_m]] += r[ri_h]; if (r[ri_t] === US) usM[r[ri_m]] += r[ri_h]; }
+  el("tlScope").innerHTML = scopeBtns(); el("tlScope").hidden = !OTHERS.length;
   const sumIdx = (arr, idx) => idx.reduce((s, i) => s + (i >= 0 ? arr[i] : 0), 0);
   const us = groups.map(g => sumIdx(usM, g)), all = groups.map(g => sumIdx(allM, g)), non = all.map((a, k) => a - us[k]);
+  // year views: the US and Non-US bars of a period sit side by side (about 56px each); month view: stacked bars
+  const slot = (el("cTl").parentElement.clientWidth - 60) / Math.max(1, labels.length);
+  const barFit = tlMode === "M" ? {maxBarThickness: 40} : {barPercentage: 0.96, categoryPercentage: Math.min(0.8, 2 * 58 / Math.max(slot, 1))};
   drawChart("cTl", {type: "bar", data: {labels, datasets: [
-      {label: "US", data: us, backgroundColor: css("--orange"), borderRadius: 3, maxBarThickness: tlMode === "M" ? 40 : 54},
-      {label: "Non-US", data: non, backgroundColor: css("--neutral"), borderRadius: 3, maxBarThickness: tlMode === "M" ? 40 : 54}]},
+      {label: "US", data: us, backgroundColor: css("--orange"), borderRadius: 3, ...barFit},
+      {label: "Non-US", data: non, backgroundColor: css("--neutral"), borderRadius: 3, ...barFit}]},
     options: {maintainAspectRatio: false, interaction: {mode: "index", intersect: false},
       plugins: {legend: {position: "top", align: "start", labels: {boxWidth: 10, boxHeight: 10}},
                 tooltip: {callbacks: {label: c => ` ${c.dataset.label}: ${fH(c.raw)} hrs`, footer: it => { const a = it.reduce((s, x) => s + x.raw, 0); return `Total ${fH(a)} hrs · US ${pct0(a ? it[0].raw / a : null)}`; }}}},
@@ -735,6 +762,7 @@ if (cys.length >= 2) TA_PERIODS.push({label: `${cyLabel(cys[cys.length - 2])} an
 cys.slice().reverse().forEach(p => TA_PERIODS.push({label: cyLabel(p), parts: [{title: cyLabel(p), idx: p.idx}]}));
 fys.slice().reverse().forEach(p => TA_PERIODS.push({label: fyLabel(p), parts: [{title: fyLabel(p), idx: p.idx}]}));
 TA_PERIODS.push({label: LTM.short, parts: [{title: LTM.title, idx: LTM.idx}]});
+TA_PERIODS.push({label: ALLP.title, parts: [{title: ALLP.title, idx: ALLP.idx}]});
 
 function taTable(part) {
   const rows = taRows(part.idx), on = included(rows), X = totals(on);
@@ -764,7 +792,8 @@ function renderAnalysis() {
   el("taTables").innerHTML = P.parts.map(taTable).join("");
   const missing = new Set(); P.parts.forEach(part => taRows(part.idx).forEach(r => { if (!r.ok) missing.add(r.name); }));
   el("taBasis").textContent = "US tagged rate: Global Model rate for the person's level. Non-tagged rate: current price (Staff Master) for the year of the hours. " +
-    (missing.size ? `Excluded (no rate or price on file): ${[...missing].join(", ")}. ` : "") + (D.meta.taggingNote || "");
+    (missing.size ? `Excluded (no rate or price on file): ${[...missing].join(", ")}. ` : "") +
+    (OTHERS.length ? `Team = people in Staff Master; ${OTHERS.length} ${OTHERS.length === 1 ? "person" : "people"} in the hours but not in Staff Master (Others) ${OTHERS.length === 1 ? "is" : "are"} not part of this analysis. ` : "") + (D.meta.taggingNote || "");
   // net cost by person, for the latest table in the selected period
   const last = P.parts[P.parts.length - 1], ppl = included(taRows(last.idx)).sort((a, b) => a.c3 - b.c3);
   el("pplNote").textContent = `${last.title}. Green: credit from other territories exceeds the cost of tagging the person.`;
@@ -775,7 +804,10 @@ function renderAnalysis() {
         tooltip: {callbacks: {label: c => { const r = ppl[c.dataIndex]; return [` Net cost ${fMoney(r.c3)}`, ` ${lvName(r.level)} · US ${fHr(r.us)} hrs · non-US ${fHr(r.non)} hrs`]; }}}},
       scales: {x: {grid: {color: css("--grid")}, border: {display: false}, ticks: {callback: v => fKs(v)}}, y: {grid: {display: false}, ticks: {autoSkip: false, font: {size: 11}}}}}});
   // hours by territory and financial year
-  const ps = periods("FY"), tv = (t, p) => p.idx.reduce((s, i) => s + MT[t][i], 0), tot = p => p.idx.reduce((s, i) => s + monthTotal[i], 0);
+  const TM = T.map(() => new Array(NM).fill(0)), tM = new Array(NM).fill(0);
+  for (const r of ALL) if (inScope(r)) { TM[r[ri_t]][r[ri_m]] += r[ri_h]; tM[r[ri_m]] += r[ri_h]; }
+  el("terrScope").innerHTML = scopeBtns(); el("terrScope").hidden = !OTHERS.length;
+  const ps = periods("FY"), tv = (t, p) => p.idx.reduce((s, i) => s + TM[t][i], 0), tot = p => p.idx.reduce((s, i) => s + tM[i], 0);
   const order = US >= 0 ? [US, ...T.map((_, t) => t).filter(t => t !== US)] : T.map((_, t) => t);
   const rowsT = order.map(t => ({cells: [sw(tColor(t)) + esc(T[t]), ...ps.map(p => fH(tv(t, p)))]}));
   rowsT.push({cls: "tot", cells: ["Total", ...ps.map(p => fH(tot(p)))]});
@@ -795,7 +827,7 @@ function renderRateCard() {
       return {cells: [esc(lvName(l)), a != null ? fUSD(a) : "–",
         g !== D.model[l].rate ? `${fUSD(D.model[l].rate)} → <b style="color:var(--orange)">${fUSD(g)}</b>` : fUSD(g),
         a ? `<span class="${a - g >= 0 ? "up" : "down"}">${pct0((a - g) / a)}</span>` : "–",
-        D.model[l].cpp ? fUSD(D.model[l].cpp) : "–", S.filter(s => s.level === l).length]}; }));
+        D.model[l].cpp ? fUSD(D.model[l].cpp) : "–", S.filter(s => s.level === l && s.inTeam !== false).length]}; }));
 }
 function renderTeam() {
   const c = (D.content || {}).team; el("teamBlock").hidden = !c; if (!c) return;
@@ -823,6 +855,7 @@ function renderThemes() {
   if (et < 0) { el("thKpis").innerHTML = ""; return; }
   let h = 0, tot = 0, ph = 0; const pr = new Set(), tr = new Set();
   for (const r of ALL) {
+    if (!inTeam(r[ri_s])) continue;
     if (inWindow(r[ri_m], 12)) { tot += r[ri_h]; if (r[ri_cat] === et) { h += r[ri_h]; pr.add(r[ri_p]); tr.add(r[ri_t]); } }
     else if (inWindow(r[ri_m], 12, LAST - 12) && r[ri_cat] === et) ph += r[ri_h];
   }
@@ -835,11 +868,16 @@ function renderThemes() {
 function initControls() {
   el("taPeriod").innerHTML = TA_PERIODS.map((p, k) => `<option value="${k}">${esc(p.label)}</option>`).join("");
   el("sLevel").innerHTML = el("tLevel").innerHTML = levelBtns();
+  el("sYear").innerHTML = SUM_P.map((p, k) => `<option value="${k}">${esc(p.title)}</option>`).join("");
+  el("sYear").addEventListener("change", e => { SY = +e.target.value; renderSummary(); });
+  el("sPerson").addEventListener("change", e => { SPER = e.target.value === "all" ? "all" : +e.target.value; renderSummary(); });
   initRates();
   [el("sLevel"), el("tLevel")].forEach(x => x.addEventListener("click", e => { const b = e.target.closest("button"); if (b) setLevel(b.dataset.v); }));
   el("sRates").addEventListener("input", e => { const i = e.target.closest("input"); if (!i) return; RATE[i.closest(".rate").dataset.lv] = +i.value; renderSummary(); });
   el("sReset").addEventListener("click", () => { resetRates(); renderSummary(); });
   el("tlMode").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { tlMode = b.dataset.v; renderTimeline(); } });
+  [el("tlScope"), el("terrScope")].forEach(x => x.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+    SCOPE = b.dataset.v; renderTimeline(); if (curTab === "analysis") renderAnalysis(); }));
   el("tlRange").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { tlRange = +b.dataset.v; renderTimeline(); } });
   el("taPeriod").addEventListener("change", renderAnalysis);
   el("taTables").addEventListener("change", e => { const c = e.target.closest("input[type=checkbox]"); if (!c) return; const i = +c.dataset.i; c.checked ? TA.off.delete(i) : TA.off.add(i); renderAnalysis(); });
