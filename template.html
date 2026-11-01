@@ -222,13 +222,18 @@ th.hl{background:var(--orange)}
 .seg.wrap{display:flex;flex-wrap:wrap}
 .seg.wrap button{flex:1 1 auto;white-space:nowrap}
 .btn.sm{padding:3px 10px;font-size:12px}
-.rate{display:grid;grid-template-columns:118px minmax(0,1fr) 62px;column-gap:12px;align-items:center;padding:9px 0 7px;border-bottom:1px solid var(--grid)}
-.rate:last-child{border-bottom:0}
+.rate{display:grid;grid-template-columns:minmax(96px,1.1fr) 52px minmax(0,1.6fr) 50px;column-gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums}
+.rate.hd{font-size:11.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px;border-bottom:1px solid var(--border)}
 .rate.hide{display:none}
+.rate .n{text-align:right}
 .rate .nm{font-weight:700;font-size:13px}
-.rate .v{font:700 18px var(--head);color:var(--orange);text-align:right;font-variant-numeric:tabular-nums}
-.rate .h{grid-column:2 / 4;font-size:11.5px;color:var(--text-3)}
-.rate .h b{color:var(--good)}
+.rate .td{text-align:right;font-size:14px;color:var(--text-2)}
+.rate .sl{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;align-items:center}
+.rate .v{font:700 17px var(--head);color:var(--text);text-align:right}
+.rate .v.moved{color:var(--orange)}
+.rate .ch{text-align:right;font-size:13px;font-weight:700}
+.rate .ch .lower{color:var(--good)} .rate .ch .higher{color:var(--bad)}
+.rnote{font-size:11.5px;color:var(--text-3);margin-top:8px}
 .hero{margin-bottom:0}
 .headline .g{color:var(--good)}
 .stiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:16px}
@@ -266,7 +271,7 @@ select{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--borde
 .basis{font-size:12px;color:var(--text-3);margin-top:8px}
 @media (max-width:1100px){.stiles{grid-template-columns:repeat(3,minmax(0,1fr))} .panel,.sum-who{grid-template-columns:1fr}}
 @media (max-width:900px){.tl,.tkpis{grid-template-columns:1fr 1fr}}
-@media (max-width:640px){.stiles,.tl{grid-template-columns:1fr 1fr} .rate{grid-template-columns:96px minmax(0,1fr) 56px} .kp li{grid-template-columns:80px 1fr}}
+@media (max-width:640px){.stiles,.tl{grid-template-columns:1fr 1fr} .rate{grid-template-columns:minmax(78px,1fr) 44px minmax(0,1.4fr) 42px;column-gap:8px} .rate .sl{grid-template-columns:minmax(0,1fr) 38px;gap:4px} .kp li{grid-template-columns:80px 1fr}}
 /* ---- v5 changes */
 .grp2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .grp2 select{width:100%}
@@ -321,7 +326,7 @@ header nav{margin-top:4px}
         <div><label class="gl" for="sPerson">Person</label><select id="sPerson"></select></div>
       </div>
       <div class="grp"><div class="gl">Staff level</div><div class="seg wrap" id="sLevel"></div></div>
-      <div class="grp"><div class="gl"><span>US hourly rate after tagging</span><button class="btn sm" id="sReset">Reset</button></div><div id="sRates"></div></div>
+      <div class="grp"><div class="gl"><span>Hourly rates</span><button class="btn sm" id="sReset">Reset</button></div><div id="sRates"></div></div>
     </div>
     <div class="card" id="coCard"><div class="lab2">Key call-outs</div><ul class="co" id="sCallouts"></ul></div>
     </div>
@@ -632,11 +637,16 @@ function renderWho() {
   el("wMembers").textContent = [t.teamName, t.members].filter(Boolean).join(" · ");
   el("wServices").innerHTML = (t.currentServices || []).slice(0, 8).map(x => `<span>${esc(x)}</span>`).join("");
 }
+// today's hourly price for a level: average current price (Staff Master, latest year) across the team
+const avgToday = l => { const v = S.map((s, i) => s.level === l && inTeam(i) ? rateOf(i, cy(LAST)) : null).filter(v => v != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
 function initRates() {
-  el("sRates").innerHTML = LEVELS.map(l => { const m = D.model[l].rate;
-    return `<div class="rate" data-lv="${l}"><span class="nm">${esc(lvName(l))}</span>
-      <input type="range" min="${Math.max(1, Math.round(m * .5))}" max="${Math.round(m * 1.5)}" step="1" value="${m}" aria-label="US rate per hour if tagged, ${esc(lvName(l))}">
-      <span class="v"></span><span class="h"></span></div>`; }).join("") || "<div class='note'>No levels with a rate in the rate card tab.</div>";
+  el("sRates").innerHTML = !LEVELS.length ? "<div class='note'>No levels with a rate in the rate card tab.</div>" :
+    `<div class="rate hd"><span>Level</span><span class="n">Today</span><span>US rate after tagging</span><span class="n">Change</span></div>` +
+    LEVELS.map(l => { const m = D.model[l].rate, t = avgToday(l);
+      return `<div class="rate" data-lv="${l}"><span class="nm">${esc(lvName(l))}</span><span class="td">${t != null ? fUSD(t) : "–"}</span>
+        <span class="sl"><input type="range" min="${Math.max(1, Math.round(m * .5))}" max="${Math.round(m * 1.5)}" step="1" value="${m}" aria-label="US rate per hour after tagging, ${esc(lvName(l))}"><span class="v"></span></span>
+        <span class="ch"></span></div>`; }).join("") +
+    `<div class="rnote">Today: average current hourly price. US rate: starts at the Global Model rate; drag to test another rate.</div>`;
 }
 
 const SUM_P = [ALLP, ...fys.slice().reverse().map(p => ({title: fyLabel(p), short: fyLabel(p), idx: p.idx}))];
@@ -650,13 +660,13 @@ function renderSummary() {
   const rows = one ? [one] : inLevel, on = one ? [one] : included(rows), X = totals(on);
   const subj = one ? esc(one.name) : "the team", poss = one ? "their" : "its";
   el("sNote").textContent = `Based on the hours in the Project Hours Raw Data (${mLabel(0)} to ${mLabel(LAST)}). Choose a year, a person or a staff level, or adjust the US rate to test the numbers.`;
-  const all = taRows(P.idx, "all").filter(r => r.ok);   // rate hints use everyone with hours, ticked or not
-  el("sRates").querySelectorAll(".rate").forEach(row => {
-    const l = row.dataset.lv, grp = all.filter(r => r.level === l), tot = grp.reduce((s, r) => s + r.tot, 0), cr = grp.reduce((s, r) => s + r.c2, 0);
+  el("sRates").querySelectorAll(".rate[data-lv]").forEach(row => {
+    const l = row.dataset.lv, t = avgToday(l), d = t ? RATE[l] / t - 1 : null;
     row.classList.toggle("hide", LV !== "all" && LV !== l);
     row.querySelector("input").value = RATE[l];
     row.querySelector(".v").textContent = "$" + RATE[l];
-    row.querySelector(".h").innerHTML = `Global rate $${D.model[l].rate}` + (tot ? ` · No net cost to the US up to <b>$${Math.floor(cr / tot)}</b>` : " · No hours in this period");
+    row.querySelector(".v").classList.toggle("moved", RATE[l] !== D.model[l].rate);
+    row.querySelector(".ch").innerHTML = d == null ? "–" : `<span class="${d <= 0 ? "lower" : "higher"}">${d > 0 ? "+" : "−"}${pct0(Math.abs(d))}</span>`;
   });
   const who = LV === "all" ? "all levels" : lvPlural(LV);
   el("sEyebrow").textContent = one ? `${P.title} · ${lvName(one.level)}` : `${P.title} · ${who} · ${on.length} ${on.length === 1 ? "person" : "people"}`;
