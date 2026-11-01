@@ -617,11 +617,17 @@ def build_payload(raw, staff, model, callouts, assum, wrn_cat, inputs, source_na
     model_default = not model_rates
     if model_default:
         model_rates = {lv: {"name": n, "rate": float(r), "cpp": float(c)} for lv, (n, r, c) in DEFAULT_MODEL.items()}
-    # levels written out in full ("Manager") are matched to the rate card codes ("M")
-    by_name = {v["name"].strip().upper(): k for k, v in model_rates.items()}
+    # Match level spellings to the rate card codes: "Manager" -> M, "ASSOCIATE 2" / "Senior Associate II" -> A / SA
+    def base_level(v):
+        v = re.sub(r"[^A-Z ]", " ", str(v).upper())                      # drop digits and punctuation
+        v = re.sub(r"\bSR\b", "SENIOR", v)
+        v = re.sub(r"\b(I{1,3}|IV|V|GRADE|LEVEL|LVL|BAND)\b", " ", v)     # drop grade markers
+        return re.sub(r"\s+", " ", v).strip()
+    by_name = {base_level(v["name"]): k for k, v in model_rates.items()}
+    by_name.update({base_level(k): k for k in model_rates})
     for st in smap.values():
-        if st["level"] and st["level"] not in model_rates and st["level"] in by_name:
-            st["level"] = by_name[st["level"]]
+        if st["level"] and st["level"] not in model_rates:
+            st["level"] = by_name.get(base_level(st["level"]), st["level"])
 
     calls = []
     if not callouts.empty:
