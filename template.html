@@ -345,7 +345,7 @@ header nav{margin-top:4px}
     <div class="seg" id="tlMode"><button data-v="FY" class="on">Financial year</button><button data-v="CY">Calendar year</button><button data-v="M">Month</button></div>
     <div class="seg" id="tlRange" hidden><button data-v="12" class="on">Last 12 months</button><button data-v="0" id="tlSince">Since first US engagement</button></div>
     <div class="seg" id="tlScope" hidden></div></div>
-  <div class="card"><div class="note" id="tlNote" style="font-size:13.5px;color:var(--text)"></div><div class="chart"><canvas id="cTl"></canvas></div></div>
+  <div class="card"><div class="chart"><canvas id="cTl"></canvas></div></div>
 
   <div class="sec-h"><h2>Rates: current price vs Global Model</h2></div>
   <div class="card"><div class="note" id="rcNote"></div><div class="tw" id="rateCard" style="max-height:none"></div></div>
@@ -760,10 +760,7 @@ function renderTimeline() {
   const k = labels.length - 1;
   // compare like with like: a partial year against the same months a year earlier
   const prevIdx = groups[k].map(i => i - 12).filter(i => i >= 0), prevUS = prevIdx.length === groups[k].length ? sumIdx(usM, prevIdx) : 0;
-  const prevLabel = tlMode === "M" ? mLabel(groups[k][0] - 12) : (groups[k].length < 12 ? "the same months last year" : esc(labels[k - 1] || ""));
   el("tlTitle").textContent = prevUS > 0 && us[k] > prevUS ? "US demand is growing" : "US hours over time";
-  el("tlNote").innerHTML = US < 0 ? "No US hours in the data yet." : `<b>${esc(labels[k])}:</b> ${fH(us[k])} US hours (${pct0(all[k] ? us[k] / all[k] : null)} of all hours)` +
-    (prevUS > 0 ? `, <b>${us[k] >= prevUS ? "up" : "down"} ${pct0(Math.abs(us[k] / prevUS - 1))}</b> on ${prevLabel}.` : ".");
 }
 
 // ================= ANALYSIS
