@@ -344,7 +344,7 @@ header nav{margin-top:4px}
   <div class="sec-h"><h2 id="tlTitle">US hours over time</h2>
     <div class="seg" id="tlMode"><button data-v="FY" class="on">Financial year</button><button data-v="CY">Calendar year</button><button data-v="M">Month</button></div>
     <div class="seg" id="tlRange" hidden><button data-v="12" class="on">Last 12 months</button><button data-v="0" id="tlSince">Since first US engagement</button></div>
-    <div class="seg" id="tlScope" hidden></div></div>
+    <div class="seg" id="tlView" style="margin-left:auto"><button data-v="us" class="on">US specific</button><button data-v="all">All territories</button></div></div>
   <div class="card"><div class="chart"><canvas id="cTl"></canvas></div></div>
 
   <div class="sec-h"><h2>Rates: current price vs Global Model</h2></div>
@@ -405,9 +405,9 @@ header nav{margin-top:4px}
     <div class="basis" id="taBasis"></div>
   </div>
   <div class="grid g2" style="margin-top:16px;align-items:start">
-    <div class="card"><h2>Net cost to the US by person</h2><div class="note" id="pplNote"></div><div class="chart" id="cPeopleBox"><canvas id="cPeople"></canvas></div></div>
+    <div class="card"><h2 id="pplTitle">Saving vs today by person</h2><div class="note" id="pplNote"></div><div class="chart" id="cPeopleBox"><canvas id="cPeople"></canvas></div></div>
     <div class="grid" style="gap:16px">
-      <div class="card"><div class="ctl" style="justify-content:space-between;margin-bottom:2px"><h2>Hours by territory</h2><div class="seg" id="terrScope" hidden></div></div><div class="note">By financial year</div><div class="tw" id="terrTable" style="max-height:none"></div></div>
+      <div class="card"><h2>Hours by territory</h2><div class="note">By financial year, all hours</div><div class="tw" id="terrTable" style="max-height:none"></div></div>
     </div>
   </div>
 
@@ -508,7 +508,7 @@ function makeChart(id, type, labels, datasets, o = {}) {
 // Dashed vertical lines with labels for call-outs
 const calloutPlugin = {
   id: "callouts",
-  afterDatasetsDraw(chart, _, opts) {
+  beforeDatasetsDraw(chart, _, opts) {   // behind the bars, so labels stay readable
     if (!opts || !opts.items) return;
     const {ctx, chartArea: a, scales: {x}} = chart;
     ctx.save();
@@ -593,9 +593,6 @@ const ALLP = {title: `All hours (${mLabel(0)} to ${mLabel(LAST)})`, short: "All 
 
 const inTeam = i => S[i].inTeam !== false;
 const OTHERS = S.map((s, i) => i).filter(i => !inTeam(i));
-let SCOPE = "team";   // hours chart and territory table: "team" or "all" (team + Others)
-const inScope = r => SCOPE === "all" || inTeam(r[ri_s]);
-function scopeBtns() { return `<button data-v="team" class="${SCOPE === "team" ? "on" : ""}">Our team</button><button data-v="all" class="${SCOPE === "all" ? "on" : ""}">Team + Others</button>`; }
 function taRows(idx, lv = LV) {
   const inP = new Set(idx), P = S.map((s, i) => ({i, name: s.name, level: s.level, us: 0, non: 0, credit: 0, today: 0, priced: true}));
   for (const r of ALL) {
@@ -703,19 +700,25 @@ function renderSummary() {
   renderTimeline(); renderRateCard();
 }
 
+// value at the end of each horizontal bar (right of positive bars, left of negative ones)
+const hBarValues = {id: "hBarValues", afterDatasetsDraw(ch) {
+  const {ctx} = ch, d = ch.data.datasets[0].data; ctx.save(); ctx.font = "bold 11px Arial, Helvetica, sans-serif"; ctx.fillStyle = css("--text"); ctx.textBaseline = "middle";
+  ch.getDatasetMeta(0).data.forEach((b, k) => { const v = d[k]; if (v == null) return; const neg = v < 0;
+    ctx.textAlign = neg ? "right" : "left"; ctx.fillText(fKs(v), b.x + (neg ? -5 : 5), b.y); });
+  ctx.restore(); }};
 // a little space between the legend and the plot
 const legendGap = {id: "legendGap", beforeInit(ch) { const fit = ch.legend.fit; ch.legend.fit = function () { fit.call(this); this.height += 12; }; }};
 // value labels on bars: drawn only where they fit, so they never overlap
 const fitLabels = {id: "fitLabels", afterDatasetsDraw(ch) {
   const {ctx} = ch, stacked = !!ch.options.scales.x.stacked, ds = ch.data.datasets; ctx.save(); ctx.textAlign = "center";
   const fits = (b, t) => b.width >= ctx.measureText(t).width + 4;
-  if (stacked) {   // month view: US value inside the orange bar, total on top
+  if (stacked) {   // month view: US value inside the orange bar (US view), total on top
     ctx.font = "10.5px Arial, Helvetica, sans-serif";
-    const us = ch.getDatasetMeta(0), top = ch.getDatasetMeta(ds.length - 1);
-    us.data.forEach((b, k) => {
-      const v = ds[0].data[k], tot = ds.reduce((s, d) => s + (d.data[k] || 0), 0);
-      if (v && !us.hidden && Math.abs(b.base - b.y) >= 14 && fits(b, fH(v))) { ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(fH(v), b.x, (b.y + b.base) / 2); }
-      const t = top.data[k]; if (tot && t && fits(t, fH(tot))) { ctx.fillStyle = css("--text"); ctx.textBaseline = "bottom"; ctx.fillText(fH(tot), t.x, Math.min(t.y, b.y) - 3); }
+    const metas = ds.map((_, di) => ch.getDatasetMeta(di)).filter(m => !m.hidden), first = metas[0];
+    if (first) first.data.forEach((b, k) => {
+      const v = ds[first.index].data[k], tot = metas.reduce((s, m) => s + (ds[m.index].data[k] || 0), 0);
+      if (ds[first.index].inside && v && Math.abs(b.base - b.y) >= 14 && fits(b, fH(v))) { ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(fH(v), b.x, (b.y + b.base) / 2); }
+      const topY = Math.min(...metas.map(m => m.data[k].y)); if (tot && fits(b, fH(tot))) { ctx.fillStyle = css("--text"); ctx.textBaseline = "bottom"; ctx.fillText(fH(tot), b.x, topY - 3); }
     });
   } else {
     ctx.font = "11px Arial, Helvetica, sans-serif"; ctx.fillStyle = css("--text"); ctx.textBaseline = "bottom";
@@ -732,6 +735,7 @@ function renderCallouts() {
 }
 
 // ---------- US work over time (all people, all work)
+let tlView = "us";   // "us" = US vs Non-US, "all" = one series per territory
 let tlMode = "FY", tlRange = 12;   // Month view: 12 = last 12 months, 0 = since the first month with US hours
 function renderTimeline() {
   el("tlMode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === tlMode));
@@ -742,27 +746,33 @@ function renderTimeline() {
   if (tlMode === "M") { const first = US >= 0 ? Math.max(0, M.findIndex((_, i) => ALL.some(r => r[ri_m] === i && r[ri_t] === US))) : 0;
     const idx = M.map((_, i) => i).slice(tlRange ? Math.max(0, NM - tlRange) : first); labels = idx.map(mLabel); groups = idx.map(i => [i]); }
   else { const ps = periods(tlMode); labels = ps.map(p => p.label); groups = ps.map(p => p.idx); }
-  const usM = M.map(() => 0), allM = M.map(() => 0);
-  for (const r of ALL) { if (!inScope(r)) continue; allM[r[ri_m]] += r[ri_h]; if (r[ri_t] === US) usM[r[ri_m]] += r[ri_h]; }
-  el("tlScope").innerHTML = scopeBtns(); el("tlScope").hidden = !OTHERS.length;
+  const usM = M.map(() => 0), allM = M.map(() => 0), terM = T.map(() => M.map(() => 0));
+  for (const r of ALL) { allM[r[ri_m]] += r[ri_h]; terM[r[ri_t]][r[ri_m]] += r[ri_h]; if (r[ri_t] === US) usM[r[ri_m]] += r[ri_h]; }
+  el("tlView").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === tlView));
   const sumIdx = (arr, idx) => idx.reduce((s, i) => s + (i >= 0 ? arr[i] : 0), 0);
   const us = groups.map(g => sumIdx(usM, g)), all = groups.map(g => sumIdx(allM, g)), non = all.map((a, k) => a - us[k]);
-  // year views: the US and Non-US bars of a period sit side by side (about 56px each); month view: stacked bars
+  // year views: the bars of a period sit side by side (about 56px each); month view: stacked bars
+  const series = tlView === "all"
+    ? T.map((n, t) => ({label: n, data: groups.map(g => sumIdx(terM[t], g)), color: tColor(t)})).filter(x => x.data.some(v => v > 0))
+    : [{label: "US", data: us, color: css("--orange"), inside: true}, {label: "Non-US", data: non, color: css("--neutral")}];
   const slot = (el("cTl").parentElement.clientWidth - 60) / Math.max(1, labels.length);
-  const barFit = tlMode === "M" ? {maxBarThickness: 40} : {barPercentage: 0.96, categoryPercentage: Math.min(0.8, 2 * 58 / Math.max(slot, 1))};
-  drawChart("cTl", {type: "bar", data: {labels, datasets: [
-      {label: "US", data: us, backgroundColor: css("--orange"), borderRadius: 3, ...barFit},
-      {label: "Non-US", data: non, backgroundColor: css("--neutral"), borderRadius: 3, ...barFit}]},
+  const barFit = tlMode === "M" ? {maxBarThickness: 40} : {barPercentage: 0.96, categoryPercentage: Math.min(0.8, series.length * 58 / Math.max(slot, 1))};
+  // call-outs as dashed lines in the month view
+  const items = tlMode !== "M" ? [] : (D.callouts || []).map(c => ({i: groups.findIndex(g => g[0] === M.indexOf(c.month)), c}))
+    .filter(x => x.i >= 0).map(x => ({idx: x.i, text: mLabel(M.indexOf(x.c.month)) + " " + String(x.c.event).split(" - ")[0].split(" by ")[0]}));
+  drawChart("cTl", {type: "bar", data: {labels, datasets: series.map(x => ({label: x.label, data: x.data, backgroundColor: x.color, borderRadius: 3, inside: !!x.inside, ...barFit}))},
     options: {maintainAspectRatio: false, interaction: {mode: "index", intersect: false},
       plugins: {legend: {position: "top", align: "start", labels: {boxWidth: 10, boxHeight: 10}},
-                tooltip: {callbacks: {label: c => ` ${c.dataset.label}: ${fH(c.raw)} hrs`, footer: it => { const a = it.reduce((s, x) => s + x.raw, 0); return `Total ${fH(a)} hrs · US ${pct0(a ? it[0].raw / a : null)}`; }}}},
+                tooltip: {callbacks: {label: c => ` ${c.dataset.label}: ${fH(c.raw)} hrs`, footer: it => { const a = it.reduce((s, x) => s + x.raw, 0), u = it.find(x => x.dataset.label === "US" || x.dataset.label === T[US]);
+                  return `Total ${fH(a)} hrs` + (u ? ` · US ${pct0(a ? u.raw / a : null)}` : ""); }}},
+                callouts: {items}},
       scales: {x: {stacked: tlMode === "M", grid: {display: false}, ticks: {maxRotation: 0, autoSkipPadding: 12}},
-               y: {stacked: tlMode === "M", beginAtZero: true, grace: "8%", grid: {color: css("--grid")}, border: {display: false}, ticks: {callback: v => v.toLocaleString("en-US")}}},
-      layout: {padding: {top: 0}}}, plugins: [fitLabels, legendGap]});
+               y: {stacked: tlMode === "M", beginAtZero: true, grace: items.length ? "16%" : "8%", grid: {color: css("--grid")}, border: {display: false}, ticks: {callback: v => v.toLocaleString("en-US")}}},
+      layout: {padding: {top: 0}}}, plugins: [fitLabels, legendGap, calloutPlugin]});
   const k = labels.length - 1;
   // compare like with like: a partial year against the same months a year earlier
   const prevIdx = groups[k].map(i => i - 12).filter(i => i >= 0), prevUS = prevIdx.length === groups[k].length ? sumIdx(usM, prevIdx) : 0;
-  el("tlTitle").textContent = prevUS > 0 && us[k] > prevUS ? "US demand is growing" : "US hours over time";
+  el("tlTitle").textContent = tlView === "all" ? "Hours by territory" : prevUS > 0 && us[k] > prevUS ? "US demand is growing" : "US hours over time";
 }
 
 // ================= ANALYSIS
@@ -803,19 +813,21 @@ function renderAnalysis() {
   el("taBasis").textContent = "US tagged rate: Global Model rate for the person's level. Non-tagged rate: current price (Staff Master) for the year of the hours. " +
     (missing.size ? `Excluded (no rate or price on file): ${[...missing].join(", ")}. ` : "") +
     (OTHERS.length ? `Team = people in Staff Master; ${OTHERS.length} ${OTHERS.length === 1 ? "person" : "people"} in the hours but not in Staff Master (Others) ${OTHERS.length === 1 ? "is" : "are"} not part of this analysis. ` : "") + (D.meta.taggingNote || "");
-  // net cost by person, for the latest table in the selected period
-  const last = P.parts[P.parts.length - 1], ppl = included(taRows(last.idx)).sort((a, b) => a.c3 - b.c3);
-  el("pplNote").textContent = `${last.title}. Green: credit from other territories exceeds the cost of tagging the person.`;
-  el("cPeopleBox").style.height = Math.max(220, ppl.length * 24 + 50) + "px";
+  // saving vs today by person (today's cost of their US hours minus their net cost after tagging), latest table in the period
+  const last = P.parts[P.parts.length - 1], ppl = included(taRows(last.idx)).map(r => ({...r, sv: r.today - r.c3})).sort((a, b) => b.sv - a.sv);
+  el("pplTitle").textContent = `Saving vs today by person · ${last.title}`;
+  el("pplNote").textContent = "Saving = what the US pays today for the person's US hours, minus what it pays after tagging (net of credit). Green: the US saves; red: the US would pay more.";
+  el("cPeopleBox").style.height = Math.max(220, ppl.length * 26 + 50) + "px";
   drawChart("cPeople", {type: "bar", data: {labels: ppl.map(r => r.name),
-      datasets: [{data: ppl.map(r => r.c3), backgroundColor: ppl.map(r => r.c3 < 0 ? css("--good") : css("--orange")), borderRadius: 3, maxBarThickness: 18}]},
-    options: {indexAxis: "y", maintainAspectRatio: false, plugins: {legend: {display: false},
-        tooltip: {callbacks: {label: c => { const r = ppl[c.dataIndex]; return [` Net cost ${fMoney(r.c3)}`, ` ${lvName(r.level)} · US ${fHr(r.us)} hrs · non-US ${fHr(r.non)} hrs`]; }}}},
-      scales: {x: {grid: {color: css("--grid")}, border: {display: false}, ticks: {callback: v => fKs(v)}}, y: {grid: {display: false}, ticks: {autoSkip: false, font: {size: 11}}}}}});
+      datasets: [{data: ppl.map(r => r.sv), backgroundColor: ppl.map(r => r.sv >= 0 ? css("--good") : css("--bad")), borderRadius: 3, maxBarThickness: 18}]},
+    options: {indexAxis: "y", maintainAspectRatio: false, layout: {padding: {right: 8, left: 8}}, plugins: {legend: {display: false},
+        tooltip: {callbacks: {label: c => { const r = ppl[c.dataIndex];
+          return [` Saving ${fMoney(r.sv)}`, ` Today ${fMoney(r.today)} → after tagging ${fMoney(r.c3)}`, ` ${lvName(r.level)} · US ${fHr(r.us)} hrs · non-US ${fHr(r.non)} hrs`]; }}}},
+      scales: {x: {grace: "18%", grid: {color: css("--grid")}, border: {display: false}, ticks: {callback: v => fKs(v)}}, y: {grid: {display: false}, ticks: {autoSkip: false, font: {size: 11}}}}},
+    plugins: [hBarValues]});
   // hours by territory and financial year
   const TM = T.map(() => new Array(NM).fill(0)), tM = new Array(NM).fill(0);
-  for (const r of ALL) if (inScope(r)) { TM[r[ri_t]][r[ri_m]] += r[ri_h]; tM[r[ri_m]] += r[ri_h]; }
-  el("terrScope").innerHTML = scopeBtns(); el("terrScope").hidden = !OTHERS.length;
+  for (const r of ALL) { TM[r[ri_t]][r[ri_m]] += r[ri_h]; tM[r[ri_m]] += r[ri_h]; }   // all hours in the raw data
   const ps = periods("FY"), tv = (t, p) => p.idx.reduce((s, i) => s + TM[t][i], 0), tot = p => p.idx.reduce((s, i) => s + tM[i], 0);
   const order = US >= 0 ? [US, ...T.map((_, t) => t).filter(t => t !== US)] : T.map((_, t) => t);
   const rowsT = order.map(t => ({cells: [sw(tColor(t)) + esc(T[t]), ...ps.map(p => fH(tv(t, p)))]}));
@@ -885,8 +897,7 @@ function initControls() {
   el("sRates").addEventListener("input", e => { const i = e.target.closest("input"); if (!i) return; RATE[i.closest(".rate").dataset.lv] = +i.value; renderSummary(); });
   el("sReset").addEventListener("click", () => { resetRates(); renderSummary(); });
   el("tlMode").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { tlMode = b.dataset.v; renderTimeline(); } });
-  [el("tlScope"), el("terrScope")].forEach(x => x.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
-    SCOPE = b.dataset.v; renderTimeline(); if (curTab === "analysis") renderAnalysis(); }));
+  el("tlView").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { tlView = b.dataset.v; renderTimeline(); } });
   el("tlRange").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { tlRange = +b.dataset.v; renderTimeline(); } });
   el("taPeriod").addEventListener("change", renderAnalysis);
   el("taTables").addEventListener("change", e => { const c = e.target.closest("input[type=checkbox]"); if (!c) return; const i = +c.dataset.i; c.checked ? TA.off.delete(i) : TA.off.add(i); renderAnalysis(); });
